@@ -5,7 +5,7 @@
  *
  * @package   AB-Store
  * @author    LHL
- * @version   1.0.6
+ * @version   1.0.7
  * @link      https://github.com/lhl77/Typecho-Plugin-AdminBeautifyStore
  */
 
@@ -52,7 +52,7 @@ class AdminBeautifyStore_Plugin implements Typecho_Plugin_Interface
         Utils\Helper::addPanel(1, 'AdminBeautifyStore/Panel.php', 'AB插件仓库', '插件仓库', 'administrator');
 
         // 注入脚部 JS（更新检测）
-        \Typecho\Plugin::factory('admin/footer.php')->begin = array(__CLASS__, 'injectFooter');
+        Typecho_Plugin::factory('admin/footer.php')->begin = array(__CLASS__, 'injectFooter');
 
         // 初始化插件配置，避免访问"设置"页时抛出"配置信息没有找到"
         Utils\Helper::configPlugin('AdminBeautifyStore', array('_v' => '1', 'cdnMode' => 'github'));
@@ -74,14 +74,14 @@ class AdminBeautifyStore_Plugin implements Typecho_Plugin_Interface
     }
 
     /** 插件配置面板（仅用于满足 Typecho 接口要求，实际 UI 在侧边栏 Panel.php 中） */
-    public static function config(\Typecho\Widget\Helper\Form $form)
+    public static function config(Typecho_Widget_Helper_Form $form)
     {
         // 隐藏字段：确保 DB 选项始终非空（防止"配置信息没有找到"）
-        $hidden = new \Typecho\Widget\Helper\Form\Element\Hidden('_v', null, '1');
+        $hidden = new Typecho_Widget_Helper_Form_Element_Hidden('_v', null, '1');
         $form->addInput($hidden);
 
         // CDN 模式设置
-        $cdnMode = new \Typecho\Widget\Helper\Form\Element\Radio(
+        $cdnMode = new Typecho_Widget_Helper_Form_Element_Radio(
             'cdnMode',
             array(
                 'github'    => '直接连接 GitHub（默认）',
@@ -94,9 +94,9 @@ class AdminBeautifyStore_Plugin implements Typecho_Plugin_Interface
         $form->addInput($cdnMode);
 
         // 提示用户通过侧边栏访问
-        $panelUrl = \Typecho\Common::url(
+        $panelUrl = Typecho_Common::url(
             '/admin/extending.php?panel=' . urlencode('AdminBeautifyStore/Panel.php'),
-            \Typecho\Widget::widget('Widget_Options')->index
+            Typecho_Widget::widget('Widget_Options')->index
         );
         echo '<p style="margin:8px 0 0;color:var(--md-on-surface-variant,#49454f)">'
             . 'AB-Store 商店界面已添加到控制台侧边栏。'
@@ -105,7 +105,7 @@ class AdminBeautifyStore_Plugin implements Typecho_Plugin_Interface
     }
 
     /** 个人配置（空） */
-    public static function personalConfig(\Typecho\Widget\Helper\Form $form) {}
+    public static function personalConfig(Typecho_Widget_Helper_Form $form) {}
 
     // ================================================================
     //  Hook 回调
@@ -117,15 +117,15 @@ class AdminBeautifyStore_Plugin implements Typecho_Plugin_Interface
     public static function injectFooter()
     {
         try {
-            $user = \Typecho\Widget::widget('Widget_User');
+            $user = Typecho_Widget::widget('Widget_User');
             if (!$user->hasLogin()) return;
         } catch (Exception $e) {
             return;
         }
 
-        $options  = \Typecho\Widget::widget('Widget_Options');
-        $security = \Typecho\Widget::widget('Widget_Security');
-        $ajaxUrl  = \Typecho\Common::url('/action/abs', $options->index);
+        $options  = Typecho_Widget::widget('Widget_Options');
+        $security = Typecho_Widget::widget('Widget_Security');
+        $ajaxUrl  = Typecho_Common::url('/action/abs', $options->index);
         $token    = $security->getToken($ajaxUrl);
 
         // 将已安装的仓库内插件版本信息传递给前端
@@ -135,14 +135,14 @@ class AdminBeautifyStore_Plugin implements Typecho_Plugin_Interface
         echo 'window.__ABS_CFG__=' . json_encode(array(
             'ajaxUrl'       => $ajaxUrl,
             'token'         => $token,
-            'pluginUrl'     => \Typecho\Common::url('AdminBeautifyStore/', $options->pluginUrl),
+            'pluginUrl'     => Typecho_Common::url('AdminBeautifyStore/', $options->pluginUrl),
             'installedMap'  => $installedMap,
             'activatedMap'  => self::buildActivatedMap(),
-            'storeUrl'      => \Typecho\Common::url('/admin/extending.php?panel=' . urlencode('AdminBeautifyStore/Panel.php'), $options->index),
+            'storeUrl'      => Typecho_Common::url('/admin/extending.php?panel=' . urlencode('AdminBeautifyStore/Panel.php'), $options->index),
         ), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . ';';
         echo '</script>';
 
-        $assetBase = \Typecho\Common::url('AdminBeautifyStore/assets/', $options->pluginUrl);
+        $assetBase = Typecho_Common::url('AdminBeautifyStore/assets/', $options->pluginUrl);
         echo '<script src="' . $assetBase . 'update-check.js"></script>' . "\n";
     }
 
@@ -160,12 +160,12 @@ class AdminBeautifyStore_Plugin implements Typecho_Plugin_Interface
         self::outputCSS();
         echo '</style>';
 
-        $options  = \Typecho\Widget::widget('Widget_Options');
-        $security = \Typecho\Widget::widget('Widget_Security');
-        $ajaxUrl  = \Typecho\Common::url('/action/abs', $options->index);
+        $options  = Typecho_Widget::widget('Widget_Options');
+        $security = Typecho_Widget::widget('Widget_Security');
+        $ajaxUrl  = Typecho_Common::url('/action/abs', $options->index);
         $token    = $security->getToken($ajaxUrl);
-        $assetBase = \Typecho\Common::url('AdminBeautifyStore/assets/', $options->pluginUrl);
-        $pluginsUrl = \Typecho\Common::url('/admin/plugins.php', $options->index);
+        $assetBase = Typecho_Common::url('AdminBeautifyStore/assets/', $options->pluginUrl);
+        $pluginsUrl = Typecho_Common::url('/admin/plugins.php', $options->index);
 
         // 读取缓存的 JSON
         $registry = self::loadCachedRegistry();
@@ -292,7 +292,7 @@ class AdminBeautifyStore_Plugin implements Typecho_Plugin_Interface
             $localVer     = $isInstalled && isset($installedMap[$pdir]) ? $installedMap[$pdir] : '';
             $hasUpdate    = $isInstalled && $pver && $localVer && version_compare($pver, $localVer, '>');
             $settingsUrl  = $isActivated
-                ? \Typecho\Common::url('/admin/options-plugin.php?config=' . urlencode($pdir), $options->index)
+                ? Typecho_Common::url('/admin/options-plugin.php?config=' . urlencode($pdir), $options->index)
                 : '';
             $cardClass = 'abs-card';
             if ($isInstalled && $isActivated) $cardClass .= ' abs-card-active';
@@ -745,7 +745,7 @@ class AdminBeautifyStore_Plugin implements Typecho_Plugin_Interface
     public static function getRegistryUrl()
     {
         try {
-            $opts = \Typecho\Widget::widget('Widget_Options')->plugin('AdminBeautifyStore');
+            $opts = Typecho_Widget::widget('Widget_Options')->plugin('AdminBeautifyStore');
             $mode = isset($opts->cdnMode) ? $opts->cdnMode : 'github';
         } catch (Exception $e) {
             $mode = 'github';
