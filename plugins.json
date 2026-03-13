@@ -5,7 +5,7 @@
     {
       "id": "AB-Store",
       "name": "AB 插件仓库",
-      "description": "AB插件仓库 - Typecho 插件管理，建议与AdminBeautify配套使用",
+      "description": "AB插件仓库 - Typecho 插件管理，建议与AdminBeautify配套使用 (本插件更新失败时，请到 lhl77/Typecho-Plugin-AdminBeautifyStore 手动更新)",
       "author": "LHL",
       "authorUrl": "https://blog.lhl.one",
       "version": "1.0.1",
