@@ -18,8 +18,8 @@ class AdminBeautifyStore_Action extends Typecho_Widget implements Widget_Interfa
     public function __construct($request, $response, $params = NULL)
     {
         parent::__construct($request, $response, $params);
-        $this->db      = Typecho_Db::get();
-        $this->options = Typecho_Widget::widget('Widget_Options');
+        $this->db      = \Typecho\Db::get();
+        $this->options = \Typecho\Widget::widget('Widget_Options');
         try {
             $this->pluginOptions = $this->options->plugin('AdminBeautifyStore');
         } catch (Exception $e) {
@@ -35,6 +35,9 @@ class AdminBeautifyStore_Action extends Typecho_Widget implements Widget_Interfa
 
     public function action()
     {
+        // CSRF 保护：验证请求来自合法的 Typecho 后台表单（token 由前端通过 Widget_Security::getToken() 生成）
+        $this->security->protect();
+
         $this->checkAuth();
 
         $do = $this->request->get('do', '');
@@ -123,6 +126,15 @@ class AdminBeautifyStore_Action extends Typecho_Widget implements Widget_Interfa
         $targetDir = $this->pluginsRoot() . $dir;
         if (!is_dir($targetDir)) {
             $this->jsonError('插件目录不存在', 404);
+        }
+
+        // 安全：不允许卸载仍处于激活状态的插件，否则 Typecho 下次加载时会找不到插件文件而崩溃
+        if (class_exists('Typecho\\Plugin')) {
+            $state     = \Typecho\Plugin::export();
+            $activated = isset($state['activated']) ? $state['activated'] : array();
+            if (array_key_exists($dir, $activated)) {
+                $this->jsonError('请先禁用插件再卸载', 409);
+            }
         }
 
         if ($permanent) {
@@ -428,7 +440,7 @@ class AdminBeautifyStore_Action extends Typecho_Widget implements Widget_Interfa
                 // 因为 deactivate() 已从 DB 移除了 panel，reload 回原 panel URL 会 404
                 $data = array('dir' => $dir, 'activated' => false);
                 if ($dir === 'AdminBeautifyStore') {
-                    $data['redirect'] = Typecho_Common::url('/admin/plugins.php', $this->options->index);
+                    $data['redirect'] = \Typecho\Common::url('/admin/plugins.php', $this->options->index);
                 }
 
                 while (ob_get_level() > $obLevel) ob_end_clean();
@@ -492,6 +504,7 @@ class AdminBeautifyStore_Action extends Typecho_Widget implements Widget_Interfa
         }
 
         if (@file_put_contents($tmpFile, $zipContent) === false) {
+            @unlink($tmpFile);
             return '无法写入临时文件：' . $tmpFile;
         }
 
@@ -642,7 +655,7 @@ class AdminBeautifyStore_Action extends Typecho_Widget implements Widget_Interfa
     private function checkAuth()
     {
         try {
-            if (!Typecho_Widget::widget('Widget_User')->hasLogin()) {
+            if (!\Typecho\Widget::widget('Widget_User')->hasLogin()) {
                 $this->jsonError('请先登录', 401);
             }
         } catch (Exception $e) {
@@ -653,11 +666,11 @@ class AdminBeautifyStore_Action extends Typecho_Widget implements Widget_Interfa
     private function checkAdmin()
     {
         try {
-            $user = Typecho_Widget::widget('Widget_User');
+            $user = \Typecho\Widget::widget('Widget_User');
             if (!$user->hasLogin()) {
                 $this->jsonError('请先登录', 401);
             }
-            // 仅管理员可操作
+            // 仅管理员可操作（pass 第二参数 true = 返回 bool 而非抛异常，Typecho 1.3+）
             if ($user->pass('administrator', true) === false) {
                 $this->jsonError('权限不足，仅管理员可操作', 403);
             }
