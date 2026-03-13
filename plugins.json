@@ -1,6 +1,6 @@
 {
   "schema": "1.0",
-  "updated": "2026-03-13T13:45:26Z",
+  "updated": "2026-03-13T14:43:50Z",
   "plugins": [
     {
       "id": "AB-Store",
@@ -13,7 +13,7 @@
       "directory": "AdminBeautifyStore",
       "subDirectory": "",
       "branch": "main",
-      "downloadUrl": "",
+      "downloadUrl": "https://github.com/lhl77/Typecho-Plugin-AdminBeautifyStore/archive/refs/heads/main.zip",
       "homepage": "https://blog.lhl.one/artical/998.html",
       "tags": ["插件仓库"],
       "changelog": "https://github.com/lhl77/Typecho-Plugin-AdminBeautifyStore/releases"
