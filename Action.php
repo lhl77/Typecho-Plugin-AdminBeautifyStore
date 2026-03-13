@@ -373,29 +373,34 @@ class AdminBeautifyStore_Action extends Typecho_Widget implements Widget_Interfa
                         ->where('name = ?', 'plugins')
                 );
 
-                // 初始化默认配置（若插件有 config 且 DB 中无记录）
-                // 使用独立的输出缓冲，防止 config() 的 echo 被外层缓冲吃掉后混入响应
-                if (method_exists($className, 'config')) {
-                    ob_start();
-                    try {
-                        $form = new \Typecho\Widget\Helper\Form();
-                        call_user_func([$className, 'config'], $form);
-                        $opts = $form->getValues();
-                    } catch (\Exception $ce) {
-                        $opts = array();
-                    } finally {
-                        ob_end_clean();
-                    }
-                    if ($opts) {
+                // 初始化默认配置：确保 plugin:{dir} 记录存在于 options 表
+                // 否则进入插件设置页会抛出 "插件XX的配置信息没有找到"
+                // 注意：$opts 为空数组时 if($opts) 为 false，必须始终执行 INSERT，不能依赖 $opts 是否非空
+                try {
+                    $this->options->plugin($dir);
+                    // 记录已存在（例如重复启用），无需处理
+                } catch (\Typecho\Plugin\Exception $e) {
+                    // 记录不存在 —— 尽量从 config() 获取默认值，插件没有 config() 也插入空记录
+                    $opts = array();
+                    if (method_exists($className, 'config')) {
+                        ob_start();
                         try {
-                            $this->options->plugin($dir);
-                        } catch (\Typecho\Plugin\Exception $e) {
-                            $this->db->query(
-                                $this->db->insert('table.options')
-                                    ->rows(['name' => 'plugin:' . $dir, 'value' => serialize($opts), 'user' => 0])
-                            );
+                            $form = new \Typecho\Widget\Helper\Form();
+                            call_user_func([$className, 'config'], $form);
+                            $opts = $form->getValues();
+                            if (!is_array($opts)) {
+                                $opts = array();
+                            }
+                        } catch (\Exception $ce) {
+                            $opts = array();
+                        } finally {
+                            ob_end_clean();
                         }
                     }
+                    $this->db->query(
+                        $this->db->insert('table.options')
+                            ->rows(['name' => 'plugin:' . $dir, 'value' => serialize($opts), 'user' => 0])
+                    );
                 }
 
                 $msg = is_string($result) ? $result : '插件已启用';
