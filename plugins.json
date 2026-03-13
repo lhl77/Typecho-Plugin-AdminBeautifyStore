@@ -3,6 +3,22 @@
   "updated": "2026-03-13T07:47:46Z",
   "plugins": [
     {
+      "id": "AB-Store",
+      "name": "AB 插件仓库",
+      "description": "AB插件仓库 - Typecho 插件管理，建议与AdminBeautify配套使用",
+      "author": "LHL",
+      "authorUrl": "https://blog.lhl.one",
+      "version": "1.0.1",
+      "repo": "lhl77/Typecho-Plugin-AdminBeautifyStore",
+      "directory": "AdminBeautifyStore",
+      "subDirectory": "",
+      "branch": "main",
+      "downloadUrl": "https://github.com/lhl77/Typecho-Plugin-AdminBeautifyStore/archive/refs/heads/main.zip",
+      "homepage": "https://github.com/lhl77/Typecho-Plugin-AdminBeautifyStore",
+      "tags": ["插件仓库"],
+      "changelog": "https://github.com/lhl77/Typecho-Plugin-AdminBeautifyStore/releases"
+    },
+    {
       "id": "LinksPlus",
       "name": "Links Plus",
       "description": "友情链接管理插件，Material Design 3 风格，支持分组、模板自定义、主题预览、友链可用性检查。",
