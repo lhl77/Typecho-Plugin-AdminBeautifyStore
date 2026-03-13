@@ -170,11 +170,17 @@ class AdminBeautifyStore_Action extends Typecho_Widget implements Widget_Interfa
 
         // 1. 备份旧版本
         if (is_dir($targetDir)) {
-            $backupBase = AdminBeautifyStore_Plugin::backupDir();
-            if (!is_dir($backupBase)) {
-                @mkdir($backupBase, 0755, true);
+            // 升级 AdminBeautifyStore 自身时，backupDir() 在插件目录内部，
+            // 无法将父目录 rename/copy 到其子目录，改为直接放在 plugins 根目录下
+            if ($dir === 'AdminBeautifyStore') {
+                $backupDest = $this->pluginsRoot() . $dir . '_bak_' . date('Ymd_His');
+            } else {
+                $backupBase = AdminBeautifyStore_Plugin::backupDir();
+                if (!is_dir($backupBase)) {
+                    @mkdir($backupBase, 0755, true);
+                }
+                $backupDest = $backupBase . $dir . '_bak_' . date('Ymd_His');
             }
-            $backupDest = $backupBase . $dir . '_bak_' . date('Ymd_His');
             if (!@rename($targetDir, $backupDest)) {
                 if (!$this->copyDirectory($targetDir, $backupDest)) {
                     $this->jsonError('备份旧版本失败', 500);
