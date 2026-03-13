@@ -5,7 +5,7 @@
  *
  * @package   AB-Store
  * @author    LHL
- * @version   1.0.3
+ * @version   1.0.4
  * @link      https://github.com/lhl77/Typecho-Plugin-AdminBeautifyStore
  */
 
@@ -320,7 +320,7 @@ class AdminBeautifyStore_Plugin implements Typecho_Plugin_Interface
                         <?php else: echo htmlspecialchars($pauthor); endif; ?>
                     </div>
                 </div>
-                <div class="abs-card-badges">
+                <div class="abs-card-badge-wrap">
                     <?php if ($hasUpdate): ?>
                     <span class="abs-badge abs-badge-update">新版本 <?php echo htmlspecialchars($pver); ?></span>
                     <?php elseif ($isActivated): ?>
@@ -867,31 +867,32 @@ class AdminBeautifyStore_Plugin implements Typecho_Plugin_Interface
 .abs-tab-count{min-width:18px;height:18px;padding:0 5px;background:var(--md-surface-container,#ece6f0);color:var(--md-on-surface-variant,#49454f);border-radius:9px;font-size:.72rem;font-weight:700;display:inline-flex;align-items:center;justify-content:center}
 .abs-tab-active .abs-tab-count{background:var(--md-on-primary-container,#21005d);color:var(--md-primary-container,#eaddff)}
 .abs-count-update{background:var(--md-primary,#6750a4)!important;color:#fff!important}
-.abs-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px}
-.abs-card{background:var(--md-surface-container-low,#f7f2fa);border:1px solid var(--md-outline-variant,#cac4d0);border-radius:16px;padding:18px;display:flex;flex-direction:column;gap:10px;transition:box-shadow .2s,transform .15s;position:relative}
-.abs-card:hover{box-shadow:0 4px 16px color-mix(in srgb,var(--md-primary,#6750a4) 12%,transparent);transform:translateY(-1px)}
+.abs-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px}
+.abs-card{background:var(--md-surface-container-low,#f7f2fa);border:1.5px solid var(--md-outline-variant,#cac4d0);border-radius:20px;padding:16px 18px 14px;display:flex;flex-direction:column;gap:8px;transition:box-shadow .2s,transform .15s,border-color .2s;position:relative;overflow:hidden}
+.abs-card:hover{box-shadow:0 3px 12px color-mix(in srgb,var(--md-primary,#6750a4) 14%,transparent);transform:translateY(-1px);border-color:color-mix(in srgb,var(--md-outline-variant,#cac4d0) 70%,var(--md-primary,#6750a4))}
 .abs-card-installed{border-color:var(--md-secondary-container,#e8def8);background:color-mix(in srgb,var(--md-secondary-container,#e8def8) 30%,var(--md-surface-container-low,#f7f2fa))}
 .abs-card-update{border-color:var(--md-primary,#6750a4);background:color-mix(in srgb,var(--md-primary-container,#eaddff) 40%,var(--md-surface-container-low,#f7f2fa))}
-.abs-card-active{border-color:var(--md-tertiary-container,#c4eed0);background:color-mix(in srgb,var(--md-tertiary-container,#c4eed0) 25%,var(--md-surface-container-low,#f7f2fa))}
-.abs-card-disabled{border-color:var(--md-outline-variant,#cac4d0);background:var(--md-surface-container-lowest,#fffbfe);opacity:.78}
+.abs-card-active{border-color:color-mix(in srgb,var(--md-tertiary-container,#c4eed0) 80%,var(--md-tertiary,#006e42));background:color-mix(in srgb,var(--md-tertiary-container,#c4eed0) 28%,var(--md-surface-container-low,#f7f2fa))}
+.abs-card-disabled{border-color:var(--md-outline-variant,#cac4d0);background:var(--md-surface-container-lowest,#fffbfe);opacity:.75}
 .abs-avatar-disabled{background:var(--md-surface-container-highest,#e6e0e9)!important;color:var(--md-on-surface-variant,#49454f)!important}
-.abs-card-header{display:flex;align-items:flex-start;gap:12px}
-.abs-card-avatar{width:44px;height:44px;flex-shrink:0;background:var(--md-primary-container,#eaddff);color:var(--md-on-primary-container,#21005d);border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:1.25rem;font-weight:700;line-height:1}
+.abs-card-header{display:flex;align-items:center;gap:12px}
+.abs-card-avatar{width:46px;height:46px;flex-shrink:0;background:var(--md-primary-container,#eaddff);color:var(--md-on-primary-container,#21005d);border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:1.3rem;font-weight:700;line-height:1;letter-spacing:-.02em}
 .abs-card-meta{flex:1;min-width:0}
-.abs-card-name{font-size:1rem;font-weight:600;color:var(--md-on-surface,#1c1b1f);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.abs-card-author{font-size:.8rem;color:var(--md-on-surface-variant,#49454f);margin-top:2px}
+.abs-card-name{font-size:.97rem;font-weight:600;color:var(--md-on-surface,#1c1b1f);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.3}
+.abs-card-author{font-size:.78rem;color:var(--md-on-surface-variant,#49454f);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .abs-card-author a{color:var(--md-primary,#6750a4);text-decoration:none}
 .abs-card-author a:hover{text-decoration:underline}
-.abs-card-badges{display:flex;flex-direction:column;align-items:flex-end;gap:4px}
-.abs-card-desc{font-size:.85rem;color:var(--md-on-surface-variant,#49454f);line-height:1.5;flex:1;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
-.abs-card-tags{display:flex;flex-wrap:wrap;gap:5px}
-.abs-tag{padding:2px 8px;background:var(--md-surface-container,#ece6f0);color:var(--md-on-surface-variant,#49454f);border-radius:999px;font-size:.72rem}
-.abs-card-footer{display:flex;flex-direction:column;align-items:flex-start;gap:6px;margin-top:auto;padding-top:6px;border-top:1px solid var(--md-outline-variant,#cac4d0)}
-.abs-card-ver{display:flex;align-items:center;gap:4px;font-size:.78rem;color:var(--md-on-surface-variant,#49454f);flex-wrap:nowrap;min-width:0;overflow:hidden}
+.abs-card-badge-wrap{display:flex;flex-direction:column;align-items:flex-end;gap:3px;flex-shrink:0}
+.abs-card-desc{font-size:.84rem;color:var(--md-on-surface-variant,#49454f);line-height:1.55;flex:1;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;min-height:2.6em}
+.abs-card-tags{display:flex;flex-wrap:wrap;gap:4px}
+.abs-tag{padding:2px 9px;background:var(--md-surface-container,#ece6f0);color:var(--md-on-surface-variant,#49454f);border-radius:999px;font-size:.7rem;font-weight:500;letter-spacing:.01em}
+.abs-card-footer{display:flex;flex-direction:row;align-items:center;justify-content:space-between;gap:8px;margin-top:auto;padding-top:10px;border-top:1px solid var(--md-outline-variant,#cac4d0);flex-wrap:wrap}
+.abs-card-ver{display:flex;align-items:center;gap:4px;font-size:.76rem;color:var(--md-on-surface-variant,#49454f);flex-shrink:0;min-width:0;max-width:50%}
+.abs-card-ver span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .abs-ver-new{color:var(--md-primary,#6750a4);font-weight:600}
-.abs-card-repo{display:inline-flex;align-items:center;color:var(--md-on-surface-variant,#49454f);text-decoration:none;opacity:.7;transition:opacity .15s}
+.abs-card-repo{display:inline-flex;align-items:center;color:var(--md-on-surface-variant,#49454f);text-decoration:none;opacity:.6;transition:opacity .15s}
 .abs-card-repo:hover{opacity:1}
-.abs-card-actions{display:flex;gap:4px;flex-wrap:nowrap;align-items:center}
+.abs-card-actions{display:flex;gap:4px;flex-wrap:nowrap;align-items:center;flex-shrink:0}
 .abs-btn{display:inline-flex;align-items:center;gap:4px;padding:6px 12px;border-radius:20px;font-size:.82rem;font-weight:500;cursor:pointer;border:none;transition:background .15s,box-shadow .15s,opacity .15s;white-space:nowrap}
 .abs-btn:disabled{opacity:.5;cursor:not-allowed}
 .abs-btn .abs-icon{font-size:1rem}
