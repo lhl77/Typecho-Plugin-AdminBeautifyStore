@@ -1,6 +1,6 @@
 {
   "schema": "1.0",
-  "updated": "2026-03-13T08:46:30Z",
+  "updated": "2026-03-13T08:55:04Z",
   "plugins": [
     {
       "id": "AB-Store",
@@ -97,6 +97,22 @@
       "homepage": "https://github.com/ID521101/BingIndexNow",
       "tags": ["SEO"],
       "changelog": "https://github.com/ID521101/BingIndexNow/releases"
+    }，
+    {
+      "id": "Sitemap",
+      "name": "Sitemap",
+      "description": "(TF社区维护版) 动态生成符合搜索引擎收录标准的Xml格式站点地图插件，支持输出分类/标签页地址。 ",
+      "author": "迷你日志, Hanny",
+      "authorUrl": "https://github.com/typecho-fans/plugins/blob/master/Sitemap",
+      "version": "1.0.5",
+      "repo": "typecho-fans/plugins",
+      "directory": "Sitemap",
+      "subDirectory": "Sitemap",
+      "branch": "master",
+      "downloadUrl": "https://github.com/typecho-fans/plugins/releases/download/plugins-S_to_Z/Sitemap.zip",
+      "homepage": "https://github.com/typecho-fans/plugins/tree/master/Sitemap",
+      "tags": ["SEO"],
+      "changelog": "https://github.com/typecho-fans/plugins/tree/master/Sitemap"
     }，
   ]
 }
