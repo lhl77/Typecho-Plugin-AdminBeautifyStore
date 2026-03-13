@@ -81,7 +81,7 @@
       "homepage": "https://github.com/imzrme/Typecho-Plugin-Notice",
       "tags": ["通知推送", "邮件", "评论"],
       "changelog": "https://github.com/imzrme/Typecho-Plugin-Notice/releases"
-    }，
+    },
     {
       "id": "BingIndexNow",
       "name": "BingIndexNow",
@@ -97,7 +97,7 @@
       "homepage": "https://github.com/ID521101/BingIndexNow",
       "tags": ["SEO"],
       "changelog": "https://github.com/ID521101/BingIndexNow/releases"
-    }，
+    },
     {
       "id": "Sitemap",
       "name": "Sitemap",
