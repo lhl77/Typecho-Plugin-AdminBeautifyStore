@@ -5,7 +5,7 @@
  *
  * @package   AB-Store
  * @author    LHL
- * @version   1.0.1
+ * @version   1.0.2
  * @link      https://github.com/lhl77/Typecho-Plugin-AdminBeautifyStore
  */
 
@@ -281,7 +281,8 @@ class AdminBeautifyStore_Plugin implements Typecho_Plugin_Interface
             $pver     = isset($p['version'])      ? $p['version']     : '';
             $prepo    = isset($p['repo'])         ? $p['repo']        : '';
             $pdir     = isset($p['directory'])    ? $p['directory']   : '';
-            $psubDir  = isset($p['subDirectory']) ? $p['subDirectory'] : '';
+            $psubDir      = isset($p['subDirectory']) ? $p['subDirectory'] : '';
+            $pdownloadUrl = isset($p['downloadUrl'])  ? $p['downloadUrl']  : '';
             $phome    = isset($p['homepage'])     ? $p['homepage']    : '';
             $ptags    = isset($p['tags'])         ? (array)$p['tags'] : array();
             $pbranch  = isset($p['branch'])       ? $p['branch']      : 'main';
@@ -372,7 +373,8 @@ class AdminBeautifyStore_Plugin implements Typecho_Plugin_Interface
                             data-dir="<?php echo htmlspecialchars($pdir); ?>"
                             data-repo="<?php echo htmlspecialchars($prepo); ?>"
                             data-branch="<?php echo htmlspecialchars($pbranch); ?>"
-                            data-subdir="<?php echo htmlspecialchars($psubDir); ?>">
+                            data-subdir="<?php echo htmlspecialchars($psubDir); ?>"
+                            data-downloadurl="<?php echo htmlspecialchars($pdownloadUrl); ?>">
                         <span class="abs-icon">system_update</span>升级
                     </button>
                     <?php if ($isActivated): ?>
@@ -426,7 +428,8 @@ class AdminBeautifyStore_Plugin implements Typecho_Plugin_Interface
                             data-dir="<?php echo htmlspecialchars($pdir); ?>"
                             data-repo="<?php echo htmlspecialchars($prepo); ?>"
                             data-branch="<?php echo htmlspecialchars($pbranch); ?>"
-                            data-subdir="<?php echo htmlspecialchars($psubDir); ?>">
+                            data-subdir="<?php echo htmlspecialchars($psubDir); ?>"
+                            data-downloadurl="<?php echo htmlspecialchars($pdownloadUrl); ?>">
                         <span class="abs-icon">download</span>安装
                     </button>
                     <?php endif; ?>
@@ -597,11 +600,12 @@ class AdminBeautifyStore_Plugin implements Typecho_Plugin_Interface
         var repo    = btn.dataset.repo    || '';
         var branch  = btn.dataset.branch  || 'main';
         var subdir  = btn.dataset.subdir  || '';
+        var downloadUrl = btn.dataset.downloadurl || '';
         var name    = btn.closest('.abs-card').querySelector('.abs-card-name').textContent;
 
         if(action === 'install'){
             showProgress('正在安装 ' + name + '…');
-            absPost('install', {id:id, dir:dir, repo:repo, branch:branch, subdir:subdir}, function(res){
+            absPost('install', {id:id, dir:dir, repo:repo, branch:branch, subdir:subdir, downloadUrl:downloadUrl}, function(res){
                 hideProgress();
                 if(res.code === 0){
                     absToast('安装成功：' + name, 'success');
@@ -612,7 +616,7 @@ class AdminBeautifyStore_Plugin implements Typecho_Plugin_Interface
             });
         } else if(action === 'upgrade'){
             showProgress('正在升级 ' + name + '…');
-            absPost('upgrade', {id:id, dir:dir, repo:repo, branch:branch, subdir:subdir}, function(res){
+            absPost('upgrade', {id:id, dir:dir, repo:repo, branch:branch, subdir:subdir, downloadUrl:downloadUrl}, function(res){
                 hideProgress();
                 if(res.code === 0){
                     absToast('升级成功：' + name, 'success');

@@ -77,6 +77,7 @@ class AdminBeautifyStore_Action extends Typecho_Widget implements Widget_Interfa
         $branch  = trim($this->request->get('branch', 'main'));
         $dir     = trim($this->request->get('dir', ''));
         $subdir  = trim($this->request->get('subdir', ''));
+        $downloadUrl = trim($this->request->get('downloadUrl', ''));
 
         if (empty($repo) || empty($dir)) {
             $this->jsonError('缺少参数 repo / dir', 400);
@@ -87,8 +88,10 @@ class AdminBeautifyStore_Action extends Typecho_Widget implements Widget_Interfa
             $this->jsonError('插件目录已存在，请先卸载', 409);
         }
 
-        $zipUrl = "https://github.com/{$repo}/archive/refs/heads/{$branch}.zip";
-        $result = $this->downloadAndExtract($zipUrl, $repo, $branch, $dir, $subdir, $targetDir);
+        // 优先使用 downloadUrl（如 monorepo 的 Release 直链），否则回退到 GitHub archive
+        $isDirect = !empty($downloadUrl);
+        $zipUrl   = $isDirect ? $downloadUrl : "https://github.com/{$repo}/archive/refs/heads/{$branch}.zip";
+        $result = $this->downloadAndExtract($zipUrl, $repo, $branch, $dir, $subdir, $targetDir, $isDirect);
 
         if ($result !== true) {
             $this->jsonError($result, 500);
@@ -161,6 +164,7 @@ class AdminBeautifyStore_Action extends Typecho_Widget implements Widget_Interfa
         $branch = trim($this->request->get('branch', 'main'));
         $dir    = trim($this->request->get('dir', ''));
         $subdir = trim($this->request->get('subdir', ''));
+        $downloadUrl = trim($this->request->get('downloadUrl', ''));
 
         if (empty($repo) || empty($dir)) {
             $this->jsonError('缺少参数 repo / dir', 400);
@@ -189,9 +193,10 @@ class AdminBeautifyStore_Action extends Typecho_Widget implements Widget_Interfa
             }
         }
 
-        // 2. 下载新版本
-        $zipUrl = "https://github.com/{$repo}/archive/refs/heads/{$branch}.zip";
-        $result = $this->downloadAndExtract($zipUrl, $repo, $branch, $dir, $subdir, $targetDir);
+        // 2. 下载新版本（优先使用 downloadUrl 直链，否则回退到 GitHub archive）
+        $isDirect = !empty($downloadUrl);
+        $zipUrl   = $isDirect ? $downloadUrl : "https://github.com/{$repo}/archive/refs/heads/{$branch}.zip";
+        $result = $this->downloadAndExtract($zipUrl, $repo, $branch, $dir, $subdir, $targetDir, $isDirect);
 
         if ($result !== true) {
             $this->jsonError($result, 500);
@@ -416,9 +421,10 @@ class AdminBeautifyStore_Action extends Typecho_Widget implements Widget_Interfa
      * @param string $dir       目标目录名（不含路径）
      * @param string $subdir    ZIP 内子目录名（为空则直接解压）
      * @param string $targetDir 完整目标路径
+     * @param bool   $isDirect  true = 直链 ZIP（Release），自动探测内部目录结构；false = GitHub archive ZIP
      * @return true|string      成功返回 true，失败返回错误消息
      */
-    private function downloadAndExtract($zipUrl, $repo, $branch, $dir, $subdir, $targetDir)
+    private function downloadAndExtract($zipUrl, $repo, $branch, $dir, $subdir, $targetDir, $isDirect = false)
     {
         if (!class_exists('ZipArchive')) {
             return 'PHP ZipArchive 扩展未安装，无法解压 ZIP';
@@ -462,10 +468,34 @@ class AdminBeautifyStore_Action extends Typecho_Widget implements Widget_Interfa
         $repoName    = end($repoParts);
         $zipRootDir  = $repoName . '-' . $branch . '/';
 
-        // 如果有 subDirectory，源路径前缀为 "{zipRootDir}{subdir}/"
-        $srcPrefix = $zipRootDir;
-        if (!empty($subdir)) {
-            $srcPrefix .= trim($subdir, '/') . '/';
+        if ($isDirect) {
+            // 直链 ZIP（Release 包）：自动探测公共根目录
+            // 若所有条目均以同一目录开头则剥离该前缀，否则直接解压到根
+            $srcPrefix = '';
+            if ($zip->numFiles > 0) {
+                $first    = $zip->getNameIndex(0);
+                $slashPos = strpos($first, '/');
+                if ($slashPos !== false) {
+                    $potentialRoot = substr($first, 0, $slashPos + 1); // e.g. "Sitemap/"
+                    $allMatch = true;
+                    for ($j = 1; $j < $zip->numFiles; $j++) {
+                        if (strpos($zip->getNameIndex($j), $potentialRoot) !== 0) {
+                            $allMatch = false;
+                            break;
+                        }
+                    }
+                    if ($allMatch) {
+                        $srcPrefix = $potentialRoot;
+                    }
+                }
+            }
+        } else {
+            // GitHub archive ZIP：前缀为 "{repoName}-{branch}[/{subdir}]/"
+            // 如果有 subDirectory，源路径前缀为 "{zipRootDir}{subdir}/"
+            $srcPrefix = $zipRootDir;
+            if (!empty($subdir)) {
+                $srcPrefix .= trim($subdir, '/') . '/';
+            }
         }
 
         // 创建目标目录
@@ -510,7 +540,7 @@ class AdminBeautifyStore_Action extends Typecho_Widget implements Widget_Interfa
 
         if (!$extracted) {
             // 尝试不带 subdir 前缀直接解压（兜底）
-            return "ZIP 解压失败：在 {$zipRootDir} 中未找到有效文件，请检查 subDirectory 配置";
+            return "ZIP 解压失败：未在前缀 [{$srcPrefix}] 下找到有效文件，请检查 subDirectory / downloadUrl 配置";
         }
 
         return true;
