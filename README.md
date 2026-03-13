@@ -23,3 +23,6 @@ AB插件仓库 - Typecho 插件管理，建议与AdminBeautify配套使用
 |homepage|	❌	|插件主页|
 |tags|	❌	|标签数组，用于筛选|
 |changelog|	❌	|更新日志链接（目前仅存储，未使用）|
+
+需要 downloadUrl + subDirectory 的情况（monorepo，如 typecho-fans）：
+monorepo 的 archive ZIP 太大（含几十上百个插件），必须用 Release 直链
