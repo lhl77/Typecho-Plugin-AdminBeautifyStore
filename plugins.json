@@ -1,6 +1,6 @@
 {
   "schema": "1.0",
-  "updated": "2026-03-13T13:29:36Z",
+  "updated": "2026-03-13T13:34:44Z",
   "plugins": [
     {
       "id": "AB-Store",
@@ -125,7 +125,7 @@
       "directory": "CommentNotifier",
       "subDirectory": "",
       "branch": "main",
-      "downloadUrl": "",
+      "downloadUrl": "https://github.com/jrotty/CommentNotifier/archive/refs/tags/1.9.2.zip",
       "homepage": "https://github.com/jrotty/CommentNotifier",
       "tags": ["通知推送","邮件","评论"],
       "changelog": "https://github.com/jrotty/CommentNotifier/releases"
