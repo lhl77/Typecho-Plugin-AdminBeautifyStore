@@ -172,24 +172,37 @@ class AdminBeautifyStore_Action extends Typecho_Widget implements Widget_Interfa
 
         $targetDir = $this->pluginsRoot() . $dir;
 
-        // 1. 备份旧版本
+        // 1. 备份旧版本 / 处理自身升级
         if (is_dir($targetDir)) {
-            // 升级 AdminBeautifyStore 自身时，backupDir() 在插件目录内部，
-            // 无法将父目录 rename/copy 到其子目录，改为直接放在 plugins 根目录下
             if ($dir === 'AdminBeautifyStore') {
-                $backupDest = $this->pluginsRoot() . $dir . '_bak_' . date('Ymd_His');
+                // 自身升级：
+                // - 将内部 backup/ 暂存到 plugins 根目录（避免数据丢失）
+                // - 删除旧目录（不留 _bak_ 文件夹）
+                // - 安装完成后将 backup/ 迁回新目录
+                $internalBackup = $targetDir . DIRECTORY_SEPARATOR . 'backup';
+                $tmpBackup = $this->pluginsRoot() . 'AdminBeautifyStore_backup_tmp_' . date('Ymd_His');
+                $hasTmpBackup = false;
+                if (is_dir($internalBackup)) {
+                    if (@rename($internalBackup, $tmpBackup)) {
+                        $hasTmpBackup = true;
+                    } elseif ($this->copyDirectory($internalBackup, $tmpBackup)) {
+                        $hasTmpBackup = true;
+                        $this->deleteDirectory($internalBackup);
+                    }
+                }
+                $this->deleteDirectory($targetDir);
             } else {
                 $backupBase = AdminBeautifyStore_Plugin::backupDir();
                 if (!is_dir($backupBase)) {
                     @mkdir($backupBase, 0755, true);
                 }
                 $backupDest = $backupBase . $dir . '_bak_' . date('Ymd_His');
-            }
-            if (!@rename($targetDir, $backupDest)) {
-                if (!$this->copyDirectory($targetDir, $backupDest)) {
-                    $this->jsonError('备份旧版本失败', 500);
+                if (!@rename($targetDir, $backupDest)) {
+                    if (!$this->copyDirectory($targetDir, $backupDest)) {
+                        $this->jsonError('备份旧版本失败', 500);
+                    }
+                    $this->deleteDirectory($targetDir);
                 }
-                $this->deleteDirectory($targetDir);
             }
         }
 
@@ -200,6 +213,27 @@ class AdminBeautifyStore_Action extends Typecho_Widget implements Widget_Interfa
 
         if ($result !== true) {
             $this->jsonError($result, 500);
+        }
+
+        // 自身升级：将暂存的 backup/ 迁回新目录
+        if ($dir === 'AdminBeautifyStore' && !empty($hasTmpBackup) && !empty($tmpBackup) && is_dir($tmpBackup)) {
+            $newBackup = $targetDir . DIRECTORY_SEPARATOR . 'backup';
+            if (!@rename($tmpBackup, $newBackup)) {
+                $this->copyDirectory($tmpBackup, $newBackup);
+                $this->deleteDirectory($tmpBackup);
+            }
+        }
+
+        // 清理残留的 _bak_ 文件夹（历史遗留或其他原因产生）
+        $pluginsRoot = $this->pluginsRoot();
+        $bakPattern  = $dir . '_bak_';
+        $entries = @scandir($pluginsRoot);
+        if ($entries) {
+            foreach ($entries as $entry) {
+                if (strpos($entry, $bakPattern) === 0 && is_dir($pluginsRoot . $entry)) {
+                    $this->deleteDirectory($pluginsRoot . $entry);
+                }
+            }
         }
 
         $this->jsonSuccess(array('dir' => $dir), '升级成功');
