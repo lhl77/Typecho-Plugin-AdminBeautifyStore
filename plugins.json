@@ -65,6 +65,22 @@
       "homepage": "https://github.com/lhl77/Typecho-Plugin-LinkGo",
       "tags": ["链接管理", "SEO"],
       "changelog": "https://github.com/lhl77/Typecho-Plugin-LinkGo/releases"
+    },
+    {
+      "id": "Notice",
+      "name": "Notice",
+      "description": "Notice 是 Typecho 评论通知插件，支持 SMTP、Server酱、Qmsg酱等接口，均采用异步方式发送",
+      "author": "MZRME",
+      "authorUrl": "https://mzrme.com/archives/62.html",
+      "version": "1.1.1",
+      "repo": "imzrme/Typecho-Plugin-Notice",
+      "directory": "Notice",
+      "subDirectory": "",
+      "branch": "main",
+      "downloadUrl": "https://github.com/imzrme/Typecho-Plugin-Notice/archive/refs/tags/1.1.1.zip",
+      "homepage": "https://github.com/imzrme/Typecho-Plugin-Notice",
+      "tags": ["通知推送", "邮件"],
+      "changelog": "https://github.com/imzrme/Typecho-Plugin-Notice/releases"
     }
   ]
 }
