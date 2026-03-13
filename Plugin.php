@@ -49,7 +49,7 @@ class AdminBeautifyStore_Plugin implements Typecho_Plugin_Interface
         Utils\Helper::addAction('abs', 'AdminBeautifyStore_Action');
 
         // 在「控制台」菜单组下添加侧边栏面板
-        Utils\Helper::addPanel(1, 'AdminBeautifyStore/Panel.php', 'AB-Store', '插件仓库', 'administrator');
+        Utils\Helper::addPanel(1, 'AdminBeautifyStore/Panel.php', 'AB插件仓库', '插件仓库', 'administrator');
 
         // 注入脚部 JS（更新检测）
         Typecho_Plugin::factory('admin/footer.php')->begin = array(__CLASS__, 'injectFooter');
@@ -165,6 +165,7 @@ class AdminBeautifyStore_Plugin implements Typecho_Plugin_Interface
         $ajaxUrl  = Typecho_Common::url('/action/abs', $options->index);
         $token    = $security->getToken($ajaxUrl);
         $assetBase = Typecho_Common::url('AdminBeautifyStore/assets/', $options->pluginUrl);
+        $pluginsUrl = Typecho_Common::url('/admin/plugins.php', $options->index);
 
         // 读取缓存的 JSON
         $registry = self::loadCachedRegistry();
@@ -216,7 +217,7 @@ class AdminBeautifyStore_Plugin implements Typecho_Plugin_Interface
     <div class="abs-toolbar">
         <div class="abs-toolbar-left">
             <span class="abs-toolbar-title">
-                <span class="abs-icon">store</span>AB-Store
+                <span class="abs-icon">store</span>AB插件仓库
             </span>
             <?php if ($updateCount > 0): ?>
             <span class="abs-badge abs-badge-update"><?php echo $updateCount; ?> 个更新</span>
@@ -227,6 +228,17 @@ class AdminBeautifyStore_Plugin implements Typecho_Plugin_Interface
             <?php if ($cacheAge): ?>
             <span class="abs-stat abs-stat-muted"><?php echo htmlspecialchars($cacheAge); ?></span>
             <?php endif; ?>
+            <a href="https://github.com/lhl77/Typecho-Plugin-AdminBeautifyStore" target="_blank" rel="noopener" class="abs-btn abs-btn-text" title="向 AB插件仓库 提交插件">
+                <span class="abs-icon">add_circle_outline</span>投稿
+            </a>
+            <a href="<?php echo htmlspecialchars($pluginsUrl); ?>" class="abs-btn abs-btn-text" title="前往 Typecho 插件管理页">
+                <span class="abs-icon">extension</span>插件管理
+            </a>
+            <select id="abs-sort-sel" class="abs-sort-sel" title="排序方式">
+                <option value="alpha-asc">名称 A→Z</option>
+                <option value="alpha-desc">名称 Z→A</option>
+                <option value="default">默认顺序</option>
+            </select>
             <button class="abs-btn abs-btn-tonal" id="abs-refresh-btn" title="从 GitHub 重新拉取插件列表">
                 <span class="abs-icon">refresh</span>刷新列表
             </button>
@@ -260,7 +272,7 @@ class AdminBeautifyStore_Plugin implements Typecho_Plugin_Interface
             <p>暂无插件数据，请点击「刷新列表」从 GitHub 拉取</p>
         </div>
         <?php else: ?>
-        <?php foreach ($plugins as $p):
+        <?php $pIdx = 0; foreach ($plugins as $p): $pIdx++;
             $pid      = isset($p['id'])          ? $p['id']          : '';
             $pname    = isset($p['name'])         ? $p['name']        : $pid;
             $pdesc    = isset($p['description'])  ? $p['description'] : '';
@@ -278,13 +290,16 @@ class AdminBeautifyStore_Plugin implements Typecho_Plugin_Interface
             $isActivated  = $isInstalled && isset($activatedMap[$pdir]);
             $localVer     = $isInstalled && isset($installedMap[$pdir]) ? $installedMap[$pdir] : '';
             $hasUpdate    = $isInstalled && $pver && $localVer && version_compare($pver, $localVer, '>');
-
+            $settingsUrl  = $isActivated
+                ? Typecho_Common::url('/admin/options-plugin.php?config=' . urlencode($pdir), $options->index)
+                : '';
             $cardClass = 'abs-card';
             if ($isInstalled && $isActivated) $cardClass .= ' abs-card-active';
             if ($isInstalled && !$isActivated) $cardClass .= ' abs-card-disabled';
             if ($hasUpdate)   $cardClass .= ' abs-card-update';
         ?>
         <div class="<?php echo $cardClass; ?>"
+             data-index="<?php echo $pIdx; ?>"
              data-id="<?php echo htmlspecialchars($pid); ?>"
              data-dir="<?php echo htmlspecialchars($pdir); ?>"
              data-installed="<?php echo $isInstalled ? '1' : '0'; ?>"
@@ -361,6 +376,9 @@ class AdminBeautifyStore_Plugin implements Typecho_Plugin_Interface
                         <span class="abs-icon">system_update</span>升级
                     </button>
                     <?php if ($isActivated): ?>
+                    <a href="<?php echo htmlspecialchars($settingsUrl); ?>" class="abs-btn abs-btn-text" title="插件设置">
+                        <span class="abs-icon">settings</span>设置
+                    </a>
                     <button class="abs-btn abs-btn-text abs-action-btn"
                             data-action="disable"
                             data-id="<?php echo htmlspecialchars($pid); ?>"
@@ -368,14 +386,19 @@ class AdminBeautifyStore_Plugin implements Typecho_Plugin_Interface
                         <span class="abs-icon">pause_circle_outline</span>禁用
                     </button>
                     <?php endif; ?>
+                    <?php if (!$isActivated): ?>
                     <button class="abs-btn abs-btn-text abs-action-btn abs-btn-danger-text"
                             data-action="uninstall"
                             data-id="<?php echo htmlspecialchars($pid); ?>"
                             data-dir="<?php echo htmlspecialchars($pdir); ?>">
                         <span class="abs-icon">delete_outline</span>卸载
                     </button>
+                    <?php endif; ?>
                     <?php elseif ($isInstalled): ?>
                     <?php if ($isActivated): ?>
+                    <a href="<?php echo htmlspecialchars($settingsUrl); ?>" class="abs-btn abs-btn-text" title="插件设置">
+                        <span class="abs-icon">settings</span>设置
+                    </a>
                     <button class="abs-btn abs-btn-tonal abs-action-btn"
                             data-action="disable"
                             data-id="<?php echo htmlspecialchars($pid); ?>"
@@ -389,13 +412,13 @@ class AdminBeautifyStore_Plugin implements Typecho_Plugin_Interface
                             data-dir="<?php echo htmlspecialchars($pdir); ?>">
                         <span class="abs-icon">play_circle_outline</span>启用
                     </button>
-                    <?php endif; ?>
                     <button class="abs-btn abs-btn-text abs-action-btn abs-btn-danger-text"
                             data-action="uninstall"
                             data-id="<?php echo htmlspecialchars($pid); ?>"
                             data-dir="<?php echo htmlspecialchars($pdir); ?>">
                         <span class="abs-icon">delete_outline</span>卸载
                     </button>
+                    <?php endif; ?>
                     <?php else: ?>
                     <button class="abs-btn abs-btn-filled abs-action-btn"
                             data-action="install"
@@ -443,6 +466,17 @@ class AdminBeautifyStore_Plugin implements Typecho_Plugin_Interface
     var token   = document.getElementById('abs-root').dataset.token;
 
     // ── 工具函数 ──
+    function absNavigate(url){
+        // extending.php 面板页含复杂内联脚本，AJAX innerHTML 替换后脚本不会重新执行，
+        // 故强制走全页跳转；AdminBeautify 本身也将 extending.php 排除出 AJAX 导航。
+        var isExtending = (url || '').indexOf('extending.php') !== -1;
+        if(!isExtending && window.AdminBeautify && typeof AdminBeautify._navigateTo === 'function' && AdminBeautify._ajaxNavActive){
+            AdminBeautify._navigateTo(url, url === location.href);
+        } else {
+            location.href = url;
+        }
+    }
+
     function absPost(do_, data, cb){
         var body = new FormData();
         body.append('do', do_);
@@ -487,6 +521,34 @@ class AdminBeautifyStore_Plugin implements Typecho_Plugin_Interface
                 absToast(res.message || '刷新失败', 'error');
             }
         });
+    });
+
+    // ── 排序 ──
+    var sortSel = document.getElementById('abs-sort-sel');
+    var savedSort = (typeof localStorage !== 'undefined' && localStorage.getItem('abs-sort')) || 'alpha-asc';
+    sortSel.value = savedSort;
+
+    function sortCards(order) {
+        var grid = document.getElementById('abs-grid');
+        var cards = Array.prototype.slice.call(grid.querySelectorAll('.abs-card'));
+        cards.sort(function(a, b) {
+            if (order === 'default') {
+                return parseInt(a.dataset.index || 0, 10) - parseInt(b.dataset.index || 0, 10);
+            }
+            var na = ((a.querySelector('.abs-card-name') || {}).textContent || '').trim();
+            var nb = ((b.querySelector('.abs-card-name') || {}).textContent || '').trim();
+            var cmp = na.localeCompare(nb, 'zh-CN');
+            return order === 'alpha-asc' ? cmp : -cmp;
+        });
+        cards.forEach(function(c) { grid.appendChild(c); });
+    }
+
+    sortCards(savedSort);
+
+    sortSel.addEventListener('change', function() {
+        var v = sortSel.value;
+        try { localStorage.setItem('abs-sort', v); } catch(e) {}
+        sortCards(v);
     });
 
     // ── 搜索 ──
@@ -543,7 +605,7 @@ class AdminBeautifyStore_Plugin implements Typecho_Plugin_Interface
                 hideProgress();
                 if(res.code === 0){
                     absToast('安装成功：' + name, 'success');
-                    setTimeout(function(){ location.reload(); }, 800);
+                    setTimeout(function(){ absNavigate(location.href); }, 800);
                 } else {
                     absToast('安装失败：' + (res.message || '未知错误'), 'error');
                 }
@@ -554,7 +616,7 @@ class AdminBeautifyStore_Plugin implements Typecho_Plugin_Interface
                 hideProgress();
                 if(res.code === 0){
                     absToast('升级成功：' + name, 'success');
-                    setTimeout(function(){ location.reload(); }, 800);
+                    setTimeout(function(){ absNavigate(location.href); }, 800);
                 } else {
                     absToast('升级失败：' + (res.message || '未知错误'), 'error');
                 }
@@ -565,7 +627,7 @@ class AdminBeautifyStore_Plugin implements Typecho_Plugin_Interface
                 hideProgress();
                 if(res.code === 0){
                     absToast(res.message || '已启用：' + name, 'success');
-                    setTimeout(function(){ location.reload(); }, 800);
+                    setTimeout(function(){ absNavigate(location.href); }, 800);
                 } else {
                     absToast('启用失败：' + (res.message || '未知错误'), 'error');
                 }
@@ -576,7 +638,8 @@ class AdminBeautifyStore_Plugin implements Typecho_Plugin_Interface
                 hideProgress();
                 if(res.code === 0){
                     absToast(res.message || '已禁用：' + name, 'success');
-                    setTimeout(function(){ location.reload(); }, 800);
+                    var redirectUrl = res.data && res.data.redirect ? res.data.redirect : null;
+                    setTimeout(function(){ absNavigate(redirectUrl || location.href); }, 800);
                 } else {
                     absToast('禁用失败：' + (res.message || '未知错误'), 'error');
                 }
@@ -608,7 +671,7 @@ class AdminBeautifyStore_Plugin implements Typecho_Plugin_Interface
             hideProgress();
             if(res.code === 0){
                 absToast('已卸载并备份：' + pendingUninstall.name, 'success');
-                setTimeout(function(){ location.reload(); }, 800);
+                setTimeout(function(){ absNavigate(location.href); }, 800);
             } else {
                 absToast('卸载失败：' + (res.message || '未知错误'), 'error');
             }
@@ -623,7 +686,7 @@ class AdminBeautifyStore_Plugin implements Typecho_Plugin_Interface
             hideProgress();
             if(res.code === 0){
                 absToast('已彻底删除：' + pendingUninstall.name, 'success');
-                setTimeout(function(){ location.reload(); }, 800);
+                setTimeout(function(){ absNavigate(location.href); }, 800);
             } else {
                 absToast('删除失败：' + (res.message || '未知错误'), 'error');
             }
@@ -819,13 +882,13 @@ class AdminBeautifyStore_Plugin implements Typecho_Plugin_Interface
 .abs-card-desc{font-size:.85rem;color:var(--md-on-surface-variant,#49454f);line-height:1.5;flex:1;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
 .abs-card-tags{display:flex;flex-wrap:wrap;gap:5px}
 .abs-tag{padding:2px 8px;background:var(--md-surface-container,#ece6f0);color:var(--md-on-surface-variant,#49454f);border-radius:999px;font-size:.72rem}
-.abs-card-footer{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-top:auto;padding-top:6px;border-top:1px solid var(--md-outline-variant,#cac4d0)}
-.abs-card-ver{display:flex;align-items:center;gap:4px;font-size:.78rem;color:var(--md-on-surface-variant,#49454f)}
+.abs-card-footer{display:flex;flex-direction:column;align-items:flex-start;gap:6px;margin-top:auto;padding-top:6px;border-top:1px solid var(--md-outline-variant,#cac4d0)}
+.abs-card-ver{display:flex;align-items:center;gap:4px;font-size:.78rem;color:var(--md-on-surface-variant,#49454f);flex-wrap:nowrap;min-width:0;overflow:hidden}
 .abs-ver-new{color:var(--md-primary,#6750a4);font-weight:600}
 .abs-card-repo{display:inline-flex;align-items:center;color:var(--md-on-surface-variant,#49454f);text-decoration:none;opacity:.7;transition:opacity .15s}
 .abs-card-repo:hover{opacity:1}
-.abs-card-actions{display:flex;gap:6px;flex-wrap:wrap}
-.abs-btn{display:inline-flex;align-items:center;gap:4px;padding:7px 16px;border-radius:20px;font-size:.85rem;font-weight:500;cursor:pointer;border:none;transition:background .15s,box-shadow .15s,opacity .15s;white-space:nowrap}
+.abs-card-actions{display:flex;gap:4px;flex-wrap:nowrap;align-items:center}
+.abs-btn{display:inline-flex;align-items:center;gap:4px;padding:6px 12px;border-radius:20px;font-size:.82rem;font-weight:500;cursor:pointer;border:none;transition:background .15s,box-shadow .15s,opacity .15s;white-space:nowrap}
 .abs-btn:disabled{opacity:.5;cursor:not-allowed}
 .abs-btn .abs-icon{font-size:1rem}
 .abs-btn-filled{background:var(--md-primary,#6750a4);color:var(--md-on-primary,#fff)}
@@ -834,9 +897,11 @@ class AdminBeautifyStore_Plugin implements Typecho_Plugin_Interface
 .abs-btn-danger:hover:not(:disabled){background:color-mix(in srgb,var(--md-error,#b3261e) 85%,#000)!important}
 .abs-btn-tonal{background:var(--md-secondary-container,#e8def8);color:var(--md-on-secondary-container,#1d192b)}
 .abs-btn-tonal:hover:not(:disabled){background:color-mix(in srgb,var(--md-secondary-container,#e8def8) 80%,#000)}
-.abs-btn-text{background:transparent;color:var(--md-primary,#6750a4);padding:7px 10px}
+.abs-sort-sel{padding:5px 28px 5px 10px;border:1px solid var(--md-outline-variant,#cac4d0);border-radius:20px;background:var(--md-surface-container-low,#f7f2fa) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%2349454f' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E") no-repeat right 10px center;color:var(--md-on-surface,#1c1b1f);font-size:.82rem;font-weight:500;cursor:pointer;outline:none;-webkit-appearance:none;appearance:none;transition:border-color .15s;height:auto;line-height:1.5}
+.abs-sort-sel:focus{border-color:var(--md-primary,#6750a4);box-shadow:0 0 0 2px color-mix(in srgb,var(--md-primary,#6750a4) 18%,transparent)}
+.abs-btn-text{background:transparent;color:var(--md-primary,#6750a4);padding:6px 8px}
 .abs-btn-text:hover:not(:disabled){background:color-mix(in srgb,var(--md-primary,#6750a4) 8%,transparent)}
-.abs-btn-danger-text{background:transparent;color:var(--md-error,#b3261e);padding:7px 10px}
+.abs-btn-danger-text{background:transparent;color:var(--md-error,#b3261e);padding:6px 8px}
 .abs-btn-danger-text:hover:not(:disabled){background:color-mix(in srgb,var(--md-error,#b3261e) 8%,transparent)}
 .abs-icon{font-family:'Material Icons Round','Material Icons',sans-serif;font-style:normal;font-weight:normal;font-size:1.25rem;line-height:1;vertical-align:middle;display:inline-block;-webkit-font-smoothing:antialiased;user-select:none}
 .abs-icon-sm{font-size:.95rem}

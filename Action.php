@@ -279,9 +279,14 @@ class AdminBeautifyStore_Action extends Typecho_Widget implements Widget_Interfa
             $this->jsonError('插件目录不存在', 404);
         }
 
+        // 开始输出缓冲，防止插件的 activate/deactivate/config 方法中的 echo 污染 JSON 响应
+        $obLevel = ob_get_level();
+        ob_start();
+
         try {
             // Typecho 1.3+ 使用命名空间 Plugin 类
             if (!class_exists('Typecho\\Plugin')) {
+                while (ob_get_level() > $obLevel) ob_end_clean();
                 $this->jsonError('当前 Typecho 版本不支持此操作，请在插件管理页手动操作', 501);
             }
 
@@ -290,9 +295,11 @@ class AdminBeautifyStore_Action extends Typecho_Widget implements Widget_Interfa
             $isActivated   = array_key_exists($dir, $activated);
 
             if ($enable && $isActivated) {
+                while (ob_get_level() > $obLevel) ob_end_clean();
                 $this->jsonError('插件已处于启用状态', 409);
             }
             if (!$enable && !$isActivated) {
+                while (ob_get_level() > $obLevel) ob_end_clean();
                 $this->jsonError('插件已处于禁用状态', 409);
             }
 
@@ -303,10 +310,12 @@ class AdminBeautifyStore_Action extends Typecho_Widget implements Widget_Interfa
                 // ── 启用 ──
                 $info = \Typecho\Plugin::parseInfo($pluginFileName);
                 if (!\Typecho\Plugin::checkDependence($info['since'])) {
+                    while (ob_get_level() > $obLevel) ob_end_clean();
                     $this->jsonError('插件不兼容当前 Typecho 版本', 400);
                 }
                 require_once $pluginFileName;
                 if (!class_exists($className) || !method_exists($className, 'activate')) {
+                    while (ob_get_level() > $obLevel) ob_end_clean();
                     $this->jsonError('插件类或 activate() 方法不存在', 500);
                 }
                 $result = call_user_func([$className, 'activate']);
@@ -320,22 +329,32 @@ class AdminBeautifyStore_Action extends Typecho_Widget implements Widget_Interfa
                 );
 
                 // 初始化默认配置（若插件有 config 且 DB 中无记录）
-                $form = new \Typecho\Widget\Helper\Form();
-                call_user_func([$className, 'config'], $form);
-                $opts = $form->getValues();
-                if ($opts) {
-                    // 仅当 DB 中尚无配置时才写入默认值（避免覆盖用户已有设置）
+                // 使用独立的输出缓冲，防止 config() 的 echo 被外层缓冲吃掉后混入响应
+                if (method_exists($className, 'config')) {
+                    ob_start();
                     try {
-                        $this->options->plugin($dir);
-                    } catch (\Typecho\Plugin\Exception $e) {
-                        $this->db->query(
-                            $this->db->insert('table.options')
-                                ->rows(['name' => 'plugin:' . $dir, 'value' => serialize($opts), 'user' => 0])
-                        );
+                        $form = new \Typecho\Widget\Helper\Form();
+                        call_user_func([$className, 'config'], $form);
+                        $opts = $form->getValues();
+                    } catch (\Exception $ce) {
+                        $opts = array();
+                    } finally {
+                        ob_end_clean();
+                    }
+                    if ($opts) {
+                        try {
+                            $this->options->plugin($dir);
+                        } catch (\Typecho\Plugin\Exception $e) {
+                            $this->db->query(
+                                $this->db->insert('table.options')
+                                    ->rows(['name' => 'plugin:' . $dir, 'value' => serialize($opts), 'user' => 0])
+                            );
+                        }
                     }
                 }
 
                 $msg = is_string($result) ? $result : '插件已启用';
+                while (ob_get_level() > $obLevel) ob_end_clean();
                 $this->jsonSuccess(array('dir' => $dir, 'activated' => true), $msg);
 
             } else {
@@ -354,14 +373,26 @@ class AdminBeautifyStore_Action extends Typecho_Widget implements Widget_Interfa
                 );
 
                 $msg = isset($result) && is_string($result) ? $result : '插件已禁用';
-                $this->jsonSuccess(array('dir' => $dir, 'activated' => false), $msg);
+
+                // 若禁用的是 AdminBeautifyStore 本身，前端需跳转到 plugins.php
+                // 因为 deactivate() 已从 DB 移除了 panel，reload 回原 panel URL 会 404
+                $data = array('dir' => $dir, 'activated' => false);
+                if ($dir === 'AdminBeautifyStore') {
+                    $data['redirect'] = Typecho_Common::url('/admin/plugins.php', $this->options->index);
+                }
+
+                while (ob_get_level() > $obLevel) ob_end_clean();
+                $this->jsonSuccess($data, $msg);
             }
 
         } catch (\Typecho\Plugin\Exception $e) {
+            while (ob_get_level() > $obLevel) ob_end_clean();
             $this->jsonError($e->getMessage(), 500);
         } catch (\Typecho\Widget\Exception $e) {
+            while (ob_get_level() > $obLevel) ob_end_clean();
             $this->jsonError($e->getMessage(), 500);
         } catch (\Exception $e) {
+            while (ob_get_level() > $obLevel) ob_end_clean();
             $this->jsonError($e->getMessage(), 500);
         }
     }
