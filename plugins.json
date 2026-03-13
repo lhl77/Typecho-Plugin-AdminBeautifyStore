@@ -1,6 +1,6 @@
 {
   "schema": "1.0",
-  "updated": "2025-07-01T00:00:00Z",
+  "updated": "2026-03-13T00:00:00Z",
   "plugins": [
     {
       "id": "AdminBeautify",
@@ -21,7 +21,7 @@
     {
       "id": "AdminBeautifyStore",
       "name": "AB-Store",
-      "description": "AdminBeautify 配套插件仓库，支持一键安装、升级、卸载插件，自动检测更新。",
+      "description": "AdminBeautify 配套插件仓库，支持一键安装、升级、卸载、启用/禁用插件，自动检测更新。",
       "author": "LHL",
       "authorUrl": "https://blog.lhl.one",
       "version": "1.0.0",
@@ -33,6 +33,54 @@
       "homepage": "https://github.com/lhl77/Typecho-Plugin-AdminBeautifyStore",
       "tags": ["admin", "store", "plugin-manager"],
       "changelog": "https://github.com/lhl77/Typecho-Plugin-AdminBeautifyStore/releases"
+    },
+    {
+      "id": "LinksPlus",
+      "name": "Links Plus",
+      "description": "友情链接管理插件，Material Design 3 风格，支持分组、模板自定义、主题预览、友链可用性检查。",
+      "author": "LHL",
+      "authorUrl": "https://blog.lhl.one",
+      "version": "1.3.3",
+      "repo": "lhl77/Typecho-Plugin-LinksPlus",
+      "directory": "Links",
+      "subDirectory": "",
+      "branch": "main",
+      "downloadUrl": "https://github.com/lhl77/Typecho-Plugin-LinksPlus/archive/refs/heads/main.zip",
+      "homepage": "https://github.com/lhl77/Typecho-Plugin-LinksPlus",
+      "tags": ["links", "friendship-links", "material-design"],
+      "changelog": "https://github.com/lhl77/Typecho-Plugin-LinksPlus/releases"
+    },
+    {
+      "id": "TelegramNotice",
+      "name": "TelegramNotice",
+      "description": "Telegram 推送评论与文章通知，支持多 Chat ID 群发、邮箱绑定、评论回复通知。",
+      "author": "LHL",
+      "authorUrl": "https://blog.lhl.one",
+      "version": "1.1.1",
+      "repo": "lhl77/Typecho-Plugin-TelegramNotice",
+      "directory": "TelegramNotice",
+      "subDirectory": "",
+      "branch": "main",
+      "downloadUrl": "https://github.com/lhl77/Typecho-Plugin-TelegramNotice/archive/refs/heads/main.zip",
+      "homepage": "https://github.com/lhl77/Typecho-Plugin-TelegramNotice",
+      "tags": ["notification", "telegram", "comment"],
+      "changelog": "https://github.com/lhl77/Typecho-Plugin-TelegramNotice/releases"
+    },
+    {
+      "id": "LinkGo",
+      "name": "LinkGo",
+      "description": "外部链接自动跳转插件，为站外链接添加中间跳转页，防止直接外链。",
+      "author": "LHL",
+      "authorUrl": "https://blog.lhl.one",
+      "version": "1.0.1",
+      "repo": "lhl77/Typecho-Plugin-LinkGo",
+      "directory": "LinkGo",
+      "subDirectory": "",
+      "branch": "main",
+      "downloadUrl": "https://github.com/lhl77/Typecho-Plugin-LinkGo/archive/refs/heads/main.zip",
+      "homepage": "https://github.com/lhl77/Typecho-Plugin-LinkGo",
+      "tags": ["links", "redirect", "seo"],
+      "changelog": "https://github.com/lhl77/Typecho-Plugin-LinkGo/releases"
     }
   ]
 }

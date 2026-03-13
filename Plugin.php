@@ -55,7 +55,7 @@ class AdminBeautifyStore_Plugin implements Typecho_Plugin_Interface
         Typecho_Plugin::factory('admin/footer.php')->begin = array(__CLASS__, 'injectFooter');
 
         // 初始化插件配置，避免访问"设置"页时抛出"配置信息没有找到"
-        Utils\Helper::configPlugin('AdminBeautifyStore', array('_v' => '1'));
+        Utils\Helper::configPlugin('AdminBeautifyStore', array('_v' => '1', 'cdnMode' => 'github'));
 
         // 确保 backup 目录存在
         if (!is_dir(self::backupDir())) {
@@ -76,17 +76,29 @@ class AdminBeautifyStore_Plugin implements Typecho_Plugin_Interface
     /** 插件配置面板（仅用于满足 Typecho 接口要求，实际 UI 在侧边栏 Panel.php 中） */
     public static function config(Typecho_Widget_Helper_Form $form)
     {
-        // 必须添加与 configPlugin 初始化键名一致的字段，
-        // 否则 Widget\Plugins\Config::config() 在尝试读取已存 options 时会报错。
+        // 隐藏字段：确保 DB 选项始终非空（防止"配置信息没有找到"）
         $hidden = new Typecho_Widget_Helper_Form_Element_Hidden('_v', null, '1');
         $form->addInput($hidden);
+
+        // CDN 模式设置
+        $cdnMode = new Typecho_Widget_Helper_Form_Element_Radio(
+            'cdnMode',
+            array(
+                'github'    => '直接连接 GitHub（默认）',
+                'jsdelivr'  => '通过 jsDelivr CDN（访问 raw.githubusercontent.com 受限时推荐）',
+            ),
+            'github',
+            '插件列表获取方式',
+            '仅影响「刷新列表」时的 plugins.json 拉取地址；插件安装/升级仍通过 GitHub 直接下载 ZIP。'
+        );
+        $form->addInput($cdnMode);
 
         // 提示用户通过侧边栏访问
         $panelUrl = Typecho_Common::url(
             '/admin/extending.php?panel=' . urlencode('AdminBeautifyStore/Panel.php'),
             Typecho_Widget::widget('Widget_Options')->index
         );
-        echo '<p style="margin:0 0 12px;color:var(--md-on-surface-variant,#49454f)">'
+        echo '<p style="margin:8px 0 0;color:var(--md-on-surface-variant,#49454f)">'
             . 'AB-Store 商店界面已添加到控制台侧边栏。'
             . ' <a href="' . htmlspecialchars($panelUrl) . '">点此前往 AB-Store →</a>'
             . '</p>';
@@ -121,11 +133,12 @@ class AdminBeautifyStore_Plugin implements Typecho_Plugin_Interface
 
         echo '<script>';
         echo 'window.__ABS_CFG__=' . json_encode(array(
-            'ajaxUrl'      => $ajaxUrl,
-            'token'        => $token,
-            'pluginUrl'    => Typecho_Common::url('AdminBeautifyStore/', $options->pluginUrl),
-            'installedMap' => $installedMap,
-            'storeUrl'     => Typecho_Common::url('/admin/plugins.php?config=AdminBeautifyStore', $options->index),
+            'ajaxUrl'       => $ajaxUrl,
+            'token'         => $token,
+            'pluginUrl'     => Typecho_Common::url('AdminBeautifyStore/', $options->pluginUrl),
+            'installedMap'  => $installedMap,
+            'activatedMap'  => self::buildActivatedMap(),
+            'storeUrl'      => Typecho_Common::url('/admin/extending.php?panel=' . urlencode('AdminBeautifyStore/Panel.php'), $options->index),
         ), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . ';';
         echo '</script>';
 
@@ -160,15 +173,23 @@ class AdminBeautifyStore_Plugin implements Typecho_Plugin_Interface
         // 已安装插件目录列表
         $installedDirs = self::getInstalledPluginDirs();
         $installedMap  = self::buildInstalledVersionMap();
+        $activatedMap  = self::buildActivatedMap();
 
         // 统计
-        $totalCount   = count($plugins);
+        $totalCount     = count($plugins);
         $installedCount = 0;
-        $updateCount  = 0;
+        $activeCount    = 0;
+        $disabledCount  = 0;
+        $updateCount    = 0;
         foreach ($plugins as $p) {
             $dir = isset($p['directory']) ? $p['directory'] : '';
             if ($dir && in_array($dir, $installedDirs)) {
                 $installedCount++;
+                if (isset($activatedMap[$dir])) {
+                    $activeCount++;
+                } else {
+                    $disabledCount++;
+                }
                 $remoteVer  = isset($p['version']) ? $p['version'] : '';
                 $localVer   = isset($installedMap[$dir]) ? $installedMap[$dir] : '';
                 if ($remoteVer && $localVer && version_compare($remoteVer, $localVer, '>')) {
@@ -220,7 +241,10 @@ class AdminBeautifyStore_Plugin implements Typecho_Plugin_Interface
         </div>
         <div class="abs-tabs" id="abs-tabs">
             <button class="abs-tab abs-tab-active" data-filter="all">全部 <span class="abs-tab-count"><?php echo $totalCount; ?></span></button>
-            <button class="abs-tab" data-filter="installed">已安装 <span class="abs-tab-count"><?php echo $installedCount; ?></span></button>
+            <button class="abs-tab" data-filter="active">启用中 <span class="abs-tab-count"><?php echo $activeCount; ?></span></button>
+            <?php if ($disabledCount > 0): ?>
+            <button class="abs-tab" data-filter="disabled">已禁用 <span class="abs-tab-count"><?php echo $disabledCount; ?></span></button>
+            <?php endif; ?>
             <?php if ($updateCount > 0): ?>
             <button class="abs-tab" data-filter="update">可更新 <span class="abs-tab-count abs-count-update"><?php echo $updateCount; ?></span></button>
             <?php endif; ?>
@@ -250,23 +274,26 @@ class AdminBeautifyStore_Plugin implements Typecho_Plugin_Interface
             $ptags    = isset($p['tags'])         ? (array)$p['tags'] : array();
             $pbranch  = isset($p['branch'])       ? $p['branch']      : 'main';
 
-            $isInstalled = $pdir && in_array($pdir, $installedDirs);
-            $localVer    = $isInstalled && isset($installedMap[$pdir]) ? $installedMap[$pdir] : '';
-            $hasUpdate   = $isInstalled && $pver && $localVer && version_compare($pver, $localVer, '>');
+            $isInstalled  = $pdir && in_array($pdir, $installedDirs);
+            $isActivated  = $isInstalled && isset($activatedMap[$pdir]);
+            $localVer     = $isInstalled && isset($installedMap[$pdir]) ? $installedMap[$pdir] : '';
+            $hasUpdate    = $isInstalled && $pver && $localVer && version_compare($pver, $localVer, '>');
 
             $cardClass = 'abs-card';
-            if ($isInstalled) $cardClass .= ' abs-card-installed';
+            if ($isInstalled && $isActivated) $cardClass .= ' abs-card-active';
+            if ($isInstalled && !$isActivated) $cardClass .= ' abs-card-disabled';
             if ($hasUpdate)   $cardClass .= ' abs-card-update';
         ?>
         <div class="<?php echo $cardClass; ?>"
              data-id="<?php echo htmlspecialchars($pid); ?>"
              data-dir="<?php echo htmlspecialchars($pdir); ?>"
              data-installed="<?php echo $isInstalled ? '1' : '0'; ?>"
+             data-activated="<?php echo $isActivated ? '1' : '0'; ?>"
              data-has-update="<?php echo $hasUpdate ? '1' : '0'; ?>"
              data-filter-tags="<?php echo htmlspecialchars(implode(' ', $ptags)); ?>">
 
             <div class="abs-card-header">
-                <div class="abs-card-avatar">
+                <div class="abs-card-avatar<?php echo $isInstalled && !$isActivated ? ' abs-avatar-disabled' : ''; ?>">
                     <?php echo htmlspecialchars(mb_substr($pname, 0, 1, 'UTF-8')); ?>
                 </div>
                 <div class="abs-card-meta">
@@ -280,8 +307,10 @@ class AdminBeautifyStore_Plugin implements Typecho_Plugin_Interface
                 <div class="abs-card-badges">
                     <?php if ($hasUpdate): ?>
                     <span class="abs-badge abs-badge-update">新版本 <?php echo htmlspecialchars($pver); ?></span>
+                    <?php elseif ($isActivated): ?>
+                    <span class="abs-badge abs-badge-active"><span class="abs-icon" style="font-size:.75rem">check_circle</span>启用中</span>
                     <?php elseif ($isInstalled): ?>
-                    <span class="abs-badge abs-badge-installed">已安装</span>
+                    <span class="abs-badge abs-badge-disabled">已禁用</span>
                     <?php endif; ?>
                 </div>
             </div>
@@ -331,14 +360,37 @@ class AdminBeautifyStore_Plugin implements Typecho_Plugin_Interface
                             data-subdir="<?php echo htmlspecialchars($psubDir); ?>">
                         <span class="abs-icon">system_update</span>升级
                     </button>
+                    <?php if ($isActivated): ?>
                     <button class="abs-btn abs-btn-text abs-action-btn"
+                            data-action="disable"
+                            data-id="<?php echo htmlspecialchars($pid); ?>"
+                            data-dir="<?php echo htmlspecialchars($pdir); ?>">
+                        <span class="abs-icon">pause_circle_outline</span>禁用
+                    </button>
+                    <?php endif; ?>
+                    <button class="abs-btn abs-btn-text abs-action-btn abs-btn-danger-text"
                             data-action="uninstall"
                             data-id="<?php echo htmlspecialchars($pid); ?>"
                             data-dir="<?php echo htmlspecialchars($pdir); ?>">
                         <span class="abs-icon">delete_outline</span>卸载
                     </button>
                     <?php elseif ($isInstalled): ?>
+                    <?php if ($isActivated): ?>
                     <button class="abs-btn abs-btn-tonal abs-action-btn"
+                            data-action="disable"
+                            data-id="<?php echo htmlspecialchars($pid); ?>"
+                            data-dir="<?php echo htmlspecialchars($pdir); ?>">
+                        <span class="abs-icon">pause_circle_outline</span>禁用
+                    </button>
+                    <?php else: ?>
+                    <button class="abs-btn abs-btn-filled abs-action-btn"
+                            data-action="enable"
+                            data-id="<?php echo htmlspecialchars($pid); ?>"
+                            data-dir="<?php echo htmlspecialchars($pdir); ?>">
+                        <span class="abs-icon">play_circle_outline</span>启用
+                    </button>
+                    <?php endif; ?>
+                    <button class="abs-btn abs-btn-text abs-action-btn abs-btn-danger-text"
                             data-action="uninstall"
                             data-id="<?php echo htmlspecialchars($pid); ?>"
                             data-dir="<?php echo htmlspecialchars($pdir); ?>">
@@ -463,7 +515,8 @@ class AdminBeautifyStore_Plugin implements Typecho_Plugin_Interface
             var text   = (name + ' ' + author + ' ' + tags).toLowerCase();
             var matchQ = !query || text.indexOf(query) !== -1;
             var matchF = true;
-            if(activeFilter === 'installed')    matchF = card.dataset.installed === '1';
+            if(activeFilter === 'active')       matchF = card.dataset.activated === '1';
+            if(activeFilter === 'disabled')     matchF = card.dataset.installed === '1' && card.dataset.activated !== '1';
             if(activeFilter === 'notinstalled') matchF = card.dataset.installed !== '1';
             if(activeFilter === 'update')       matchF = card.dataset.hasUpdate === '1';
             card.style.display = (matchQ && matchF) ? '' : 'none';
@@ -504,6 +557,28 @@ class AdminBeautifyStore_Plugin implements Typecho_Plugin_Interface
                     setTimeout(function(){ location.reload(); }, 800);
                 } else {
                     absToast('升级失败：' + (res.message || '未知错误'), 'error');
+                }
+            });
+        } else if(action === 'enable'){
+            showProgress('正在启用 ' + name + '…');
+            absPost('togglePlugin', {dir:dir, enable:'1'}, function(res){
+                hideProgress();
+                if(res.code === 0){
+                    absToast(res.message || '已启用：' + name, 'success');
+                    setTimeout(function(){ location.reload(); }, 800);
+                } else {
+                    absToast('启用失败：' + (res.message || '未知错误'), 'error');
+                }
+            });
+        } else if(action === 'disable'){
+            showProgress('正在禁用 ' + name + '…');
+            absPost('togglePlugin', {dir:dir, enable:'0'}, function(res){
+                hideProgress();
+                if(res.code === 0){
+                    absToast(res.message || '已禁用：' + name, 'success');
+                    setTimeout(function(){ location.reload(); }, 800);
+                } else {
+                    absToast('禁用失败：' + (res.message || '未知错误'), 'error');
                 }
             });
         } else if(action === 'uninstall'){
@@ -589,10 +664,28 @@ class AdminBeautifyStore_Plugin implements Typecho_Plugin_Interface
     }
 
     /**
-     * 从 GitHub 拉取最新 JSON
+     * 根据 CDN 设置返回 plugins.json 的拉取地址
+     */
+    public static function getRegistryUrl()
+    {
+        try {
+            $opts = Typecho_Widget::widget('Widget_Options')->plugin('AdminBeautifyStore');
+            $mode = isset($opts->cdnMode) ? $opts->cdnMode : 'github';
+        } catch (Exception $e) {
+            $mode = 'github';
+        }
+        if ($mode === 'jsdelivr') {
+            return 'https://cdn.jsdelivr.net/gh/lhl77/Typecho-Plugin-AdminBeautifyStore@main/plugins.json';
+        }
+        return self::REMOTE_JSON_URL;
+    }
+
+    /**
+     * 从远端拉取最新 JSON
      */
     public static function fetchRemoteRegistry()
     {
+        $url = self::getRegistryUrl();
         $ctx = stream_context_create(array(
             'http' => array(
                 'timeout'    => 15,
@@ -604,7 +697,7 @@ class AdminBeautifyStore_Plugin implements Typecho_Plugin_Interface
                 'verify_peer_name' => false,
             ),
         ));
-        $raw = @file_get_contents(self::REMOTE_JSON_URL, false, $ctx);
+        $raw = @file_get_contents($url, false, $ctx);
         if (!$raw) return null;
         $data = @json_decode($raw, true);
         return is_array($data) ? $data : null;
@@ -656,6 +749,27 @@ class AdminBeautifyStore_Plugin implements Typecho_Plugin_Interface
         return $map;
     }
 
+    /**
+     * 构建 [目录名 => bool] 的激活状态映射
+     * 依赖 Typecho 1.3+ 的 \Typecho\Plugin::export()
+     */
+    public static function buildActivatedMap()
+    {
+        $map = array();
+        try {
+            if (class_exists('Typecho\\Plugin')) {
+                $state     = \Typecho\Plugin::export();
+                $activated = isset($state['activated']) ? $state['activated'] : array();
+                foreach (array_keys($activated) as $pluginName) {
+                    $map[$pluginName] = true;
+                }
+            }
+        } catch (Exception $e) {
+            // 静默失败，返回空映射
+        }
+        return $map;
+    }
+
     // ================================================================
     //  内联 CSS（MD3 风格，全部使用 AdminBeautify 的 var(--md-*) 变量）
     // ================================================================
@@ -672,11 +786,13 @@ class AdminBeautifyStore_Plugin implements Typecho_Plugin_Interface
 .abs-badge{display:inline-flex;align-items:center;padding:2px 10px;border-radius:999px;font-size:.72rem;font-weight:600;line-height:1.6}
 .abs-badge-installed{background:var(--md-secondary-container,#e8def8);color:var(--md-on-secondary-container,#1d192b)}
 .abs-badge-update{background:var(--md-primary,#6750a4);color:var(--md-on-primary,#fff)}
+.abs-badge-active{background:var(--md-tertiary-container,#c4eed0);color:var(--md-on-tertiary-container,#002114);display:inline-flex;align-items:center;gap:3px}
+.abs-badge-disabled{background:var(--md-surface-container,#ece6f0);color:var(--md-on-surface-variant,#49454f)}
 .abs-filter-bar{display:flex;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:20px}
 .abs-search-wrap{position:relative;flex:1;min-width:200px;max-width:340px}
-.abs-search-icon{position:absolute;left:10px;top:50%;transform:translateY(-50%);font-size:1.1rem;color:var(--md-on-surface-variant,#49454f);pointer-events:none}
-.abs-search{width:100%;box-sizing:border-box;padding:8px 12px 8px 36px;border:1px solid var(--md-outline-variant,#cac4d0);border-radius:28px;background:var(--md-surface-container-low,#f7f2fa);color:var(--md-on-surface,#1c1b1f);font-size:.9rem;outline:none;transition:border-color .2s,box-shadow .2s}
-.abs-search:focus{border-color:var(--md-primary,#6750a4);box-shadow:0 0 0 2px color-mix(in srgb,var(--md-primary,#6750a4) 20%,transparent)}
+.abs-search-icon{position:absolute;left:10px;top:50%;transform:translateY(-50%);font-size:1.1rem;color:var(--md-on-surface-variant,#49454f);pointer-events:none;z-index:1}
+#abs-root .abs-search{display:block!important;width:100%!important;box-sizing:border-box!important;padding:8px 12px 8px 36px!important;border:1px solid var(--md-outline-variant,#cac4d0)!important;border-radius:28px!important;background:var(--md-surface-container-low,#f7f2fa)!important;color:var(--md-on-surface,#1c1b1f)!important;font-size:.9rem!important;font-family:inherit!important;line-height:1.5!important;height:auto!important;outline:none!important;box-shadow:none!important;-webkit-appearance:none!important;appearance:none!important;transition:border-color .2s,box-shadow .2s}
+#abs-root .abs-search:focus{border-color:var(--md-primary,#6750a4)!important;box-shadow:0 0 0 2px color-mix(in srgb,var(--md-primary,#6750a4) 20%,transparent)!important}
 .abs-tabs{display:flex;gap:4px;flex-wrap:wrap}
 .abs-tab{padding:6px 14px;border:1px solid var(--md-outline-variant,#cac4d0);border-radius:20px;background:transparent;color:var(--md-on-surface-variant,#49454f);font-size:.85rem;cursor:pointer;transition:background .15s,color .15s,border-color .15s;display:flex;align-items:center;gap:5px}
 .abs-tab:hover{background:var(--md-surface-container,#ece6f0);border-color:var(--md-outline-variant,#cac4d0)}
@@ -689,6 +805,9 @@ class AdminBeautifyStore_Plugin implements Typecho_Plugin_Interface
 .abs-card:hover{box-shadow:0 4px 16px color-mix(in srgb,var(--md-primary,#6750a4) 12%,transparent);transform:translateY(-1px)}
 .abs-card-installed{border-color:var(--md-secondary-container,#e8def8);background:color-mix(in srgb,var(--md-secondary-container,#e8def8) 30%,var(--md-surface-container-low,#f7f2fa))}
 .abs-card-update{border-color:var(--md-primary,#6750a4);background:color-mix(in srgb,var(--md-primary-container,#eaddff) 40%,var(--md-surface-container-low,#f7f2fa))}
+.abs-card-active{border-color:var(--md-tertiary-container,#c4eed0);background:color-mix(in srgb,var(--md-tertiary-container,#c4eed0) 25%,var(--md-surface-container-low,#f7f2fa))}
+.abs-card-disabled{border-color:var(--md-outline-variant,#cac4d0);background:var(--md-surface-container-lowest,#fffbfe);opacity:.78}
+.abs-avatar-disabled{background:var(--md-surface-container-highest,#e6e0e9)!important;color:var(--md-on-surface-variant,#49454f)!important}
 .abs-card-header{display:flex;align-items:flex-start;gap:12px}
 .abs-card-avatar{width:44px;height:44px;flex-shrink:0;background:var(--md-primary-container,#eaddff);color:var(--md-on-primary-container,#21005d);border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:1.25rem;font-weight:700;line-height:1}
 .abs-card-meta{flex:1;min-width:0}
@@ -717,6 +836,8 @@ class AdminBeautifyStore_Plugin implements Typecho_Plugin_Interface
 .abs-btn-tonal:hover:not(:disabled){background:color-mix(in srgb,var(--md-secondary-container,#e8def8) 80%,#000)}
 .abs-btn-text{background:transparent;color:var(--md-primary,#6750a4);padding:7px 10px}
 .abs-btn-text:hover:not(:disabled){background:color-mix(in srgb,var(--md-primary,#6750a4) 8%,transparent)}
+.abs-btn-danger-text{background:transparent;color:var(--md-error,#b3261e);padding:7px 10px}
+.abs-btn-danger-text:hover:not(:disabled){background:color-mix(in srgb,var(--md-error,#b3261e) 8%,transparent)}
 .abs-icon{font-family:'Material Icons Round','Material Icons',sans-serif;font-style:normal;font-weight:normal;font-size:1.25rem;line-height:1;vertical-align:middle;display:inline-block;-webkit-font-smoothing:antialiased;user-select:none}
 .abs-icon-sm{font-size:.95rem}
 .abs-icon-lg{font-size:3rem;display:block;margin-bottom:8px;opacity:.4}

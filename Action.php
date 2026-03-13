@@ -54,6 +54,9 @@ class AdminBeautifyStore_Action extends Typecho_Widget implements Widget_Interfa
             case 'checkUpdates':
                 $this->handleCheckUpdates();
                 break;
+            case 'togglePlugin':
+                $this->handleTogglePlugin();
+                break;
             default:
                 $this->jsonError('未知操作', 400);
         }
@@ -245,6 +248,122 @@ class AdminBeautifyStore_Action extends Typecho_Widget implements Widget_Interfa
             'hasUpdates' => count($updates) > 0,
             'count'      => count($updates),
         ), count($updates) > 0 ? '发现 ' . count($updates) . ' 个插件有更新' : '已是最新版本');
+    }
+
+    /**
+     * 启用 / 禁用插件（toggle）
+     * do=togglePlugin & dir={目录名} & enable=1|0
+     *
+     * 依赖 Typecho 1.3+ 的命名空间类；
+     * 若在 1.2 下运行（Typecho_Plugin 别名体系），会通过 class_exists 判断后降级为跳转方案。
+     */
+    private function handleTogglePlugin()
+    {
+        $this->checkAdmin();
+
+        $dir    = trim($this->request->get('dir', ''));
+        $enable = $this->request->get('enable', '1') === '1';
+
+        if (empty($dir)) {
+            $this->jsonError('缺少参数 dir', 400);
+        }
+        // 安全：不允许路径穿越
+        if (strpos($dir, '..') !== false || strpos($dir, '/') !== false || strpos($dir, '\\') !== false) {
+            $this->jsonError('非法目录名', 400);
+        }
+
+        // 检查插件目录是否存在
+        $pluginsRoot  = $this->pluginsRoot();
+        $pluginDir    = $pluginsRoot . $dir;
+        if (!is_dir($pluginDir)) {
+            $this->jsonError('插件目录不存在', 404);
+        }
+
+        try {
+            // Typecho 1.3+ 使用命名空间 Plugin 类
+            if (!class_exists('Typecho\\Plugin')) {
+                $this->jsonError('当前 Typecho 版本不支持此操作，请在插件管理页手动操作', 501);
+            }
+
+            $pluginState   = \Typecho\Plugin::export();
+            $activated     = isset($pluginState['activated']) ? $pluginState['activated'] : array();
+            $isActivated   = array_key_exists($dir, $activated);
+
+            if ($enable && $isActivated) {
+                $this->jsonError('插件已处于启用状态', 409);
+            }
+            if (!$enable && !$isActivated) {
+                $this->jsonError('插件已处于禁用状态', 409);
+            }
+
+            // 找到插件入口文件
+            [$pluginFileName, $className] = \Typecho\Plugin::portal($dir, $this->options->pluginDir);
+
+            if ($enable) {
+                // ── 启用 ──
+                $info = \Typecho\Plugin::parseInfo($pluginFileName);
+                if (!\Typecho\Plugin::checkDependence($info['since'])) {
+                    $this->jsonError('插件不兼容当前 Typecho 版本', 400);
+                }
+                require_once $pluginFileName;
+                if (!class_exists($className) || !method_exists($className, 'activate')) {
+                    $this->jsonError('插件类或 activate() 方法不存在', 500);
+                }
+                $result = call_user_func([$className, 'activate']);
+                \Typecho\Plugin::activate($dir);
+
+                // 持久化
+                $this->db->query(
+                    $this->db->update('table.options')
+                        ->rows(['value' => json_encode(\Typecho\Plugin::export())])
+                        ->where('name = ?', 'plugins')
+                );
+
+                // 初始化默认配置（若插件有 config 且 DB 中无记录）
+                $form = new \Typecho\Widget\Helper\Form();
+                call_user_func([$className, 'config'], $form);
+                $opts = $form->getValues();
+                if ($opts) {
+                    // 仅当 DB 中尚无配置时才写入默认值（避免覆盖用户已有设置）
+                    try {
+                        $this->options->plugin($dir);
+                    } catch (\Typecho\Plugin\Exception $e) {
+                        $this->db->query(
+                            $this->db->insert('table.options')
+                                ->rows(['name' => 'plugin:' . $dir, 'value' => serialize($opts), 'user' => 0])
+                        );
+                    }
+                }
+
+                $msg = is_string($result) ? $result : '插件已启用';
+                $this->jsonSuccess(array('dir' => $dir, 'activated' => true), $msg);
+
+            } else {
+                // ── 禁用 ──
+                require_once $pluginFileName;
+                if (class_exists($className) && method_exists($className, 'deactivate')) {
+                    $result = call_user_func([$className, 'deactivate']);
+                }
+                \Typecho\Plugin::deactivate($dir);
+
+                // 持久化
+                $this->db->query(
+                    $this->db->update('table.options')
+                        ->rows(['value' => json_encode(\Typecho\Plugin::export())])
+                        ->where('name = ?', 'plugins')
+                );
+
+                $msg = isset($result) && is_string($result) ? $result : '插件已禁用';
+                $this->jsonSuccess(array('dir' => $dir, 'activated' => false), $msg);
+            }
+
+        } catch (\Typecho\Plugin\Exception $e) {
+            $this->jsonError($e->getMessage(), 500);
+        } catch (\Typecho\Widget\Exception $e) {
+            $this->jsonError($e->getMessage(), 500);
+        } catch (\Exception $e) {
+            $this->jsonError($e->getMessage(), 500);
+        }
     }
 
     // ================================================================
