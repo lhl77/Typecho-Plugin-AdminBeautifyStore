@@ -1,6 +1,6 @@
 {
   "schema": "1.0",
-  "updated": "2026-03-14T08:50:53Z",
+  "updated": "2026-03-14T09:28:57Z",
   "plugins": [
     {
       "id": "AB-Store",
@@ -8,7 +8,7 @@
       "description": "Typecho 插件管理，与AdminBeautify配套使用",
       "author": "LHL",
       "authorUrl": "https://blog.lhl.one",
-      "version": "1.0.13",
+      "version": "1.0.14",
       "repo": "lhl77/Typecho-Plugin-AdminBeautifyStore",
       "directory": "AdminBeautifyStore",
       "subDirectory": "",
