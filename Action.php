@@ -352,7 +352,7 @@ class AdminBeautifyStore_Action extends Typecho_Widget implements Widget_Interfa
             [$pluginFileName, $className] = \Typecho\Plugin::portal($dir, $this->options->pluginDir);
 
             if ($enable) {
-                // ── 启用 ──
+                // ── 启用（严格遵循 Widget\Plugins\Edit::activate() 原生流程）──
                 $info = \Typecho\Plugin::parseInfo($pluginFileName);
                 if (!\Typecho\Plugin::checkDependence($info['since'])) {
                     while (ob_get_level() > $obLevel) ob_end_clean();
@@ -363,46 +363,49 @@ class AdminBeautifyStore_Action extends Typecho_Widget implements Widget_Interfa
                     while (ob_get_level() > $obLevel) ob_end_clean();
                     $this->jsonError('插件类或 activate() 方法不存在', 500);
                 }
-                $result = call_user_func([$className, 'activate']);
-                \Typecho\Plugin::activate($dir);
 
-                // 持久化
+                // 1. 调用插件自身的 activate()
+                $result = call_user_func([$className, 'activate']);
+                // 2. 注册钩子到内存
+                \Typecho\Plugin::activate($dir);
+                // 3. 持久化 plugins 状态到数据库
                 $this->db->query(
                     $this->db->update('table.options')
                         ->rows(['value' => json_encode(\Typecho\Plugin::export())])
                         ->where('name = ?', 'plugins')
                 );
 
-                // 初始化默认配置：确保 plugin:{dir} 记录存在于 options 表
-                // 直接查 DB，避免读 Widget_Options 的旧内存缓存（请求初始化时已快照，不含刚写入的记录）
-                // Typecho 1.3 使用 json_encode 存储插件配置，必须与之保持一致
-                $existingConfig = $this->db->fetchRow(
-                    $this->db->select()->from('table.options')
-                        ->where('name = ?', 'plugin:' . $dir)
-                        ->where('user = 0')
-                );
-                if (!$existingConfig) {
-                    // 记录不存在 —— 尽量从 config() 获取默认值，插件没有 config() 也插入空记录
-                    $opts = array();
-                    if (method_exists($className, 'config')) {
-                        ob_start();
-                        try {
-                            $form = new \Typecho\Widget\Helper\Form();
-                            call_user_func([$className, 'config'], $form);
-                            $opts = $form->getValues();
-                            if (!is_array($opts)) {
-                                $opts = array();
-                            }
-                        } catch (\Exception $ce) {
-                            $opts = array();
-                        } finally {
-                            ob_end_clean();
-                        }
+                // 4. 初始化插件配置默认值（与原生 activate() 行为完全一致）：
+                //    - 通过 config() 表单获取默认值，非空则写入 plugin:{dir}
+                //    - 通过 personalConfig() 表单获取默认值，非空则写入 _plugin:{dir}
+                //    - 如插件实现了 configHandle / personalConfigHandle，优先调用自定义处理器
+                //    - 使用 \Widget\Plugins\Edit::configPlugin() 保证 json_encode 格式与原生一致
+                $configForm = new \Typecho\Widget\Helper\Form();
+                if (method_exists($className, 'config')) {
+                    call_user_func([$className, 'config'], $configForm);
+                }
+                $configOptions = $configForm->getValues();
+
+                $personalForm = new \Typecho\Widget\Helper\Form();
+                if (method_exists($className, 'personalConfig')) {
+                    call_user_func([$className, 'personalConfig'], $personalForm);
+                }
+                $personalOptions = $personalForm->getValues();
+
+                if ($configOptions) {
+                    if (method_exists($className, 'configHandle')) {
+                        call_user_func([$className, 'configHandle'], $configOptions, true);
+                    } else {
+                        \Widget\Plugins\Edit::configPlugin($dir, $configOptions);
                     }
-                    $this->db->query(
-                        $this->db->insert('table.options')
-                            ->rows(['name' => 'plugin:' . $dir, 'value' => json_encode($opts), 'user' => 0])
-                    );
+                }
+
+                if ($personalOptions) {
+                    if (method_exists($className, 'personalConfigHandle')) {
+                        call_user_func([$className, 'personalConfigHandle'], $personalOptions, true);
+                    } else {
+                        \Widget\Plugins\Edit::configPlugin($dir, $personalOptions, true);
+                    }
                 }
 
                 $msg = is_string($result) ? $result : '插件已启用';
@@ -410,27 +413,36 @@ class AdminBeautifyStore_Action extends Typecho_Widget implements Widget_Interfa
                 $this->jsonSuccess(array('dir' => $dir, 'activated' => true), $msg);
 
             } else {
-                // ── 禁用 ──
+                // ── 禁用（严格遵循 Widget\Plugins\Edit::deactivate() 原生流程）──
                 require_once $pluginFileName;
                 if (class_exists($className) && method_exists($className, 'deactivate')) {
                     $result = call_user_func([$className, 'deactivate']);
                 }
+                // 1. 从内存中移除钩子注册
                 \Typecho\Plugin::deactivate($dir);
-
-                // 持久化
+                // 2. 持久化 plugins 状态到数据库
                 $this->db->query(
                     $this->db->update('table.options')
                         ->rows(['value' => json_encode(\Typecho\Plugin::export())])
                         ->where('name = ?', 'plugins')
                 );
+                // 3. 删除插件配置记录（与原生 deactivate() 一致）
+                $this->db->query(
+                    $this->db->delete('table.options')
+                        ->where('name = ?', 'plugin:' . $dir)
+                );
+                $this->db->query(
+                    $this->db->delete('table.options')
+                        ->where('name = ?', '_plugin:' . $dir)
+                );
 
                 $msg = isset($result) && is_string($result) ? $result : '插件已禁用';
 
-                // 若禁用的是 AdminBeautifyStore 本身，前端需跳转到 plugins.php
-                // 因为 deactivate() 已从 DB 移除了 panel，reload 回原 panel URL 会 404
+                // 若禁用的是 AdminBeautifyStore 本身，前端需跳转到原生 plugins.php
+                // 因为本插件的 panel 已被移除，无法继续留在 AB-Store 页面
                 $data = array('dir' => $dir, 'activated' => false);
                 if ($dir === 'AdminBeautifyStore') {
-                    $data['redirect'] = Typecho_Common::url('/admin/plugins.php', $this->options->index);
+                    $data['redirect'] = \Typecho\Common::url('plugins.php', $this->options->adminUrl);
                 }
 
                 while (ob_get_level() > $obLevel) ob_end_clean();
