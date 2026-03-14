@@ -5,7 +5,7 @@
  *
  * @package   AB-Store
  * @author    LHL
- * @version   1.0.8
+ * @version   1.0.9
  * @link      https://github.com/lhl77/Typecho-Plugin-AdminBeautifyStore
  */
 
@@ -131,6 +131,10 @@ class AdminBeautifyStore_Plugin implements Typecho_Plugin_Interface
         // 将已安装的仓库内插件版本信息传递给前端
         $installedMap = self::buildInstalledVersionMap();
 
+        // 读取缓存时间戳（用于前端判断是否需要自动刷新）
+        $registry = self::loadCachedRegistry();
+        $cachedAt = isset($registry['_cached_at']) ? intval($registry['_cached_at']) : 0;
+
         echo '<script>';
         echo 'window.__ABS_CFG__=' . json_encode(array(
             'ajaxUrl'       => $ajaxUrl,
@@ -139,7 +143,25 @@ class AdminBeautifyStore_Plugin implements Typecho_Plugin_Interface
             'installedMap'  => $installedMap,
             'activatedMap'  => self::buildActivatedMap(),
             'storeUrl'      => Typecho_Common::url('/admin/extending.php?panel=' . urlencode('AdminBeautifyStore/Panel.php'), $options->index),
+            'cachedAt'      => $cachedAt,
         ), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . ';';
+        // 非 Store 页面：缓存超过 10 分钟时静默更新缓存，不刷新页面
+        echo <<<'JS'
+(function(){
+    var cfg = window.__ABS_CFG__ || {};
+    if (!cfg.ajaxUrl || !cfg.token) return;
+    // Store 页面有自己的自动刷新逻辑（带页面重载），此处跳过
+    if (document.getElementById('abs-root')) return;
+    var cachedAt = cfg.cachedAt || 0;
+    var now = Math.floor(Date.now() / 1000);
+    if (cachedAt > 0 && now - cachedAt >= 600) {
+        var body = new FormData();
+        body.append('do', 'refresh');
+        body.append('_', cfg.token);
+        fetch(cfg.ajaxUrl, {method:'POST', body:body}).catch(function(){});
+    }
+})();
+JS;
         echo '</script>';
 
         $assetBase = Typecho_Common::url('AdminBeautifyStore/assets/', $options->pluginUrl);
@@ -199,6 +221,8 @@ class AdminBeautifyStore_Plugin implements Typecho_Plugin_Interface
             }
         }
 
+        $cachedAt  = isset($registry['_cached_at']) ? intval($registry['_cached_at']) : 0;
+
         $updatedAt = isset($registry['updated']) ? $registry['updated'] : '';
         $cacheAge  = '';
         if ($updatedAt) {
@@ -211,7 +235,7 @@ class AdminBeautifyStore_Plugin implements Typecho_Plugin_Interface
         }
 
         ?>
-<div id="abs-root" data-ajax="<?php echo htmlspecialchars($ajaxUrl); ?>" data-token="<?php echo htmlspecialchars($token); ?>">
+<div id="abs-root" data-ajax="<?php echo htmlspecialchars($ajaxUrl); ?>" data-token="<?php echo htmlspecialchars($token); ?>" data-cached-at="<?php echo $cachedAt; ?>">
 
     <!-- 顶部工具栏 -->
     <div class="abs-toolbar">
@@ -553,6 +577,21 @@ class AdminBeautifyStore_Plugin implements Typecho_Plugin_Interface
             }
         });
     });
+
+    // ── 自动刷新（缓存超过 10 分钟时后台静默拉取，完成后刷新页面） ──
+    (function(){
+        var root = document.getElementById('abs-root');
+        var cachedAt = parseInt((root && root.dataset.cachedAt) || '0', 10);
+        var now = Math.floor(Date.now() / 1000);
+        if (cachedAt > 0 && now - cachedAt >= 600) {
+            absPost('refresh', {}, function(res){
+                if (res.code === 0) {
+                    location.reload();
+                }
+                // 静默失败：不弹任何提示，等用户手动点刷新
+            });
+        }
+    })();
 
     // ── 排序 ──
     var sortSel = document.getElementById('abs-sort-sel');
@@ -954,13 +993,13 @@ class AdminBeautifyStore_Plugin implements Typecho_Plugin_Interface
 .abs-empty{grid-column:1/-1;padding:48px 24px;text-align:center;color:var(--md-on-surface-variant,#49454f)}
 .abs-empty p{margin:0;font-size:.95rem}
 .abs-progress-overlay{position:fixed;inset:0;z-index:9999;background:color-mix(in srgb,var(--md-surface,#fffbfe) 70%,transparent);display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px)}
-.abs-progress-card{background:var(--md-surface-container,#ece6f0);border-radius:28px;padding:32px 40px;display:flex;flex-direction:column;align-items:center;gap:16px;box-shadow:0 8px 32px rgba(0,0,0,.18);min-width:220px}
+.abs-progress-card{background:var(--md-surface-container,#ece6f0);border-radius:28px;padding:32px 40px;display:flex;flex-direction:column;align-items:center;gap:16px;box-shadow:0 8px 32px rgba(0,0,0,.18);min-width:220px;max-width:90vw;box-sizing:border-box}
 .abs-progress-card p{margin:0;font-size:.95rem;color:var(--md-on-surface,#1c1b1f);text-align:center}
 .abs-spinner{width:44px;height:44px;border:4px solid var(--md-surface-container-highest,#e6e0e9);border-top-color:var(--md-primary,#6750a4);border-radius:50%;animation:abs-spin .7s linear infinite}
 @keyframes abs-spin{to{transform:rotate(360deg)}}
-.abs-dialog-overlay{position:fixed;inset:0;z-index:10000;background:rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity .25s}
+.abs-dialog-overlay{position:fixed;inset:0;z-index:10000;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity .25s;padding:16px;box-sizing:border-box}
 .abs-dialog-overlay.abs-dialog-open{opacity:1}
-.abs-dialog{background:var(--md-surface-container-low,#f7f2fa);border-radius:28px;padding:28px 32px;width:100%;max-width:420px;box-shadow:0 8px 40px rgba(0,0,0,.22);transform:scale(.92);transition:transform .25s;display:flex;flex-direction:column;gap:14px}
+.abs-dialog{background:var(--md-surface-container-low,#f7f2fa);border-radius:28px;padding:28px 32px;width:100%;max-width:420px;box-shadow:0 8px 40px rgba(0,0,0,.22);transform:scale(.92);transition:transform .25s;display:flex;flex-direction:column;gap:14px;box-sizing:border-box}
 .abs-dialog-overlay.abs-dialog-open .abs-dialog{transform:scale(1)}
 .abs-dialog-title{display:flex;align-items:center;gap:8px;font-size:1.05rem;font-weight:600;margin:0;color:var(--md-on-surface,#1c1b1f)}
 .abs-dialog-title .abs-icon{color:var(--md-error,#b3261e)}
@@ -977,7 +1016,13 @@ class AdminBeautifyStore_Plugin implements Typecho_Plugin_Interface
 .abs-toolbar{flex-direction:column;align-items:flex-start}
 .abs-filter-bar{flex-direction:column;align-items:stretch}
 .abs-search-wrap{max-width:100%}
-.abs-dialog{margin:16px;padding:22px 20px}
+.abs-dialog-overlay{padding:12px;align-items:flex-end}
+.abs-dialog{border-radius:24px 24px 16px 16px;padding:24px 18px;max-width:100%;transform:translateY(20px) scale(1)}
+.abs-dialog-overlay.abs-dialog-open .abs-dialog{transform:translateY(0) scale(1)}
+.abs-dialog-footer{flex-direction:column-reverse;align-items:stretch}
+.abs-dialog-footer .abs-btn{width:100%;justify-content:center}
+.abs-progress-card{padding:28px 24px;border-radius:24px}
+.abs-toast{bottom:16px;padding:10px 18px;font-size:.85rem}
 }
         <?php
     }
