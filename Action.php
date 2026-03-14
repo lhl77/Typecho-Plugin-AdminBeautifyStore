@@ -380,17 +380,41 @@ class AdminBeautifyStore_Action extends Typecho_Widget implements Widget_Interfa
                 //    - 通过 personalConfig() 表单获取默认值，非空则写入 _plugin:{dir}
                 //    - 如插件实现了 configHandle / personalConfigHandle，优先调用自定义处理器
                 //    - 使用 \Widget\Plugins\Edit::configPlugin() 保证 json_encode 格式与原生一致
+                //
+                //    ⚠ 部分插件（如 CommentNotifier）在 config() 内会检查 $_GET['activate']：
+                //      若该参数为空则尝试读取尚不存在的 DB 配置记录，导致 Plugin\Exception。
+                //      原生 Typecho 启用时请求 URL 带有 ?activate=PluginName，从而跳过该读取。
+                //      这里手动设置 $_GET['activate']，调用结束后还原，以模拟原生行为。
+                $prevActivate = $_GET['activate'] ?? null;
+                $_GET['activate'] = $dir;
+
                 $configForm = new \Typecho\Widget\Helper\Form();
-                if (method_exists($className, 'config')) {
-                    call_user_func([$className, 'config'], $configForm);
+                try {
+                    if (method_exists($className, 'config')) {
+                        call_user_func([$className, 'config'], $configForm);
+                    }
+                } catch (\Exception $ignored) {
+                    // config() 仍然抛出异常（如不检查 activate 参数的插件）
+                    // 忽略，使用表单已添加的默认值（或空数组）
                 }
                 $configOptions = $configForm->getValues();
 
                 $personalForm = new \Typecho\Widget\Helper\Form();
-                if (method_exists($className, 'personalConfig')) {
-                    call_user_func([$className, 'personalConfig'], $personalForm);
+                try {
+                    if (method_exists($className, 'personalConfig')) {
+                        call_user_func([$className, 'personalConfig'], $personalForm);
+                    }
+                } catch (\Exception $ignored) {
+                    // 同上
                 }
                 $personalOptions = $personalForm->getValues();
+
+                // 还原 $_GET['activate']
+                if ($prevActivate === null) {
+                    unset($_GET['activate']);
+                } else {
+                    $_GET['activate'] = $prevActivate;
+                }
 
                 if ($configOptions) {
                     if (method_exists($className, 'configHandle')) {

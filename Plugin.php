@@ -5,7 +5,7 @@
  *
  * @package   AB-Store
  * @author    LHL
- * @version   1.0.13
+ * @version   1.0.14
  * @link      https://github.com/lhl77/Typecho-Plugin-AdminBeautifyStore
  */
 
@@ -333,12 +333,22 @@ JS;
             $hasUpdate    = $isInstalled && $pver && $localVer && version_compare($pver, $localVer, '>');
             // 是否为自身（禁用/卸载自身会产生循环依赖，需特殊处理）
             $isSelf       = ($pdir === 'AdminBeautifyStore');
-            // 只对已激活且类存在 config() 方法的插件显示"设置"按钮
+            // 只对已激活且插件具有 config() 方法的插件显示"设置"按钮
+            // 使用 \Typecho\Plugin::parseInfo() 做 token 分析而非 class_exists()：
+            //   1. Typecho 1.3+ 插件使用命名空间（TypechoPlugin\{Dir}\Plugin），class_exists('{Dir}_Plugin') 恒为 false
+            //   2. 插件类在渲染页面时未被 require，Plugin::init() 只加载钩子数据，不加载插件文件
             $hasConfig    = false;
-            if ($isActivated) {
-                $pluginClass = $pdir . '_Plugin';
-                if (class_exists($pluginClass) && method_exists($pluginClass, 'config')) {
-                    $hasConfig = true;
+            if ($isActivated && $pdir) {
+                $pluginFile = defined('__TYPECHO_PLUGIN_DIR__')
+                    ? __TYPECHO_ROOT_DIR__ . '/' . __TYPECHO_PLUGIN_DIR__ . '/' . $pdir . '/Plugin.php'
+                    : __DIR__ . '/../' . $pdir . '/Plugin.php';
+                if (file_exists($pluginFile)) {
+                    try {
+                        $pluginInfo = \Typecho\Plugin::parseInfo($pluginFile);
+                        $hasConfig  = !empty($pluginInfo['config']);
+                    } catch (\Exception $e) {
+                        $hasConfig = false;
+                    }
                 }
             }
             $settingsUrl  = $hasConfig
