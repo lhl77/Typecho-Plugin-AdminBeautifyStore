@@ -5,7 +5,7 @@
  *
  * @package   AB-Store
  * @author    LHL
- * @version   1.0.11
+ * @version   1.0.12
  * @link      https://github.com/lhl77/Typecho-Plugin-AdminBeautifyStore
  */
 

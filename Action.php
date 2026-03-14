@@ -374,12 +374,14 @@ class AdminBeautifyStore_Action extends Typecho_Widget implements Widget_Interfa
                 );
 
                 // 初始化默认配置：确保 plugin:{dir} 记录存在于 options 表
-                // 否则进入插件设置页会抛出 "插件XX的配置信息没有找到"
-                // 注意：$opts 为空数组时 if($opts) 为 false，必须始终执行 INSERT，不能依赖 $opts 是否非空
-                try {
-                    $this->options->plugin($dir);
-                    // 记录已存在（例如重复启用），无需处理
-                } catch (\Typecho\Plugin\Exception $e) {
+                // 直接查 DB，避免读 Widget_Options 的旧内存缓存（请求初始化时已快照，不含刚写入的记录）
+                // Typecho 1.3 使用 json_encode 存储插件配置，必须与之保持一致
+                $existingConfig = $this->db->fetchRow(
+                    $this->db->select()->from('table.options')
+                        ->where('name = ?', 'plugin:' . $dir)
+                        ->where('user = 0')
+                );
+                if (!$existingConfig) {
                     // 记录不存在 —— 尽量从 config() 获取默认值，插件没有 config() 也插入空记录
                     $opts = array();
                     if (method_exists($className, 'config')) {
@@ -399,7 +401,7 @@ class AdminBeautifyStore_Action extends Typecho_Widget implements Widget_Interfa
                     }
                     $this->db->query(
                         $this->db->insert('table.options')
-                            ->rows(['name' => 'plugin:' . $dir, 'value' => serialize($opts), 'user' => 0])
+                            ->rows(['name' => 'plugin:' . $dir, 'value' => json_encode($opts), 'user' => 0])
                     );
                 }
 
