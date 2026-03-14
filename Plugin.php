@@ -5,7 +5,7 @@
  *
  * @package   AB-Store
  * @author    LHL
- * @version   1.0.10
+ * @version   1.0.11
  * @link      https://github.com/lhl77/Typecho-Plugin-AdminBeautifyStore
  */
 
@@ -131,6 +131,14 @@ class AdminBeautifyStore_Plugin implements Typecho_Plugin_Interface
         // 将已安装的仓库内插件版本信息传递给前端
         $installedMap = self::buildInstalledVersionMap();
 
+        // 读取缓存时间戳，供前端判断是否需要自动刷新
+        $cacheFile = self::cacheFile();
+        $cachedAt  = 0;
+        if (file_exists($cacheFile)) {
+            $cacheData = @json_decode(file_get_contents($cacheFile), true);
+            $cachedAt  = isset($cacheData['_cached_at']) ? intval($cacheData['_cached_at']) : 0;
+        }
+
         echo '<script>';
         echo 'window.__ABS_CFG__=' . json_encode(array(
             'ajaxUrl'       => $ajaxUrl,
@@ -139,7 +147,37 @@ class AdminBeautifyStore_Plugin implements Typecho_Plugin_Interface
             'installedMap'  => $installedMap,
             'activatedMap'  => self::buildActivatedMap(),
             'storeUrl'      => Typecho_Common::url('/admin/extending.php?panel=' . urlencode('AdminBeautifyStore/Panel.php'), $options->index),
+            'cachedAt'      => $cachedAt,
         ), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . ';';
+        // 所有后台页面：缓存超过 10 分钟时静默刷新；Store 页额外触发页面重载以更新展示
+        echo <<<'JS'
+(function(){
+    var cfg = window.__ABS_CFG__ || {};
+    if (!cfg.ajaxUrl || !cfg.token) return;
+    var cachedAt = cfg.cachedAt || 0;
+    var now = Math.floor(Date.now() / 1000);
+    // 用 localStorage 记录客户端上次发起刷新的时间，避免同一窗口内多个页面重复触发
+    var lsKey = 'abs_last_refresh';
+    var lastRefresh = 0;
+    try { lastRefresh = parseInt(localStorage.getItem(lsKey) || '0', 10); } catch(e) {}
+    var effectiveAge = Math.max(cachedAt, lastRefresh); // 取服务端/客户端中更新的那个
+    if (effectiveAge > 0 && now - effectiveAge < 600) return; // 10 分钟内已刷新，跳过
+    var body = new FormData();
+    body.append('do', 'refresh');
+    body.append('_', cfg.token);
+    fetch(cfg.ajaxUrl, {method:'POST', body:body})
+        .then(function(r){ return r.json(); })
+        .then(function(res){
+            if (res.code !== 0) return;
+            try { localStorage.setItem(lsKey, String(Math.floor(Date.now() / 1000))); } catch(e) {}
+            // Store 页面需要重载以更新卡片展示
+            if (document.getElementById('abs-root')) {
+                location.reload();
+            }
+        })
+        .catch(function(){});
+})();
+JS;
         echo '</script>';
 
         $assetBase = Typecho_Common::url('AdminBeautifyStore/assets/', $options->pluginUrl);
@@ -555,21 +593,6 @@ class AdminBeautifyStore_Plugin implements Typecho_Plugin_Interface
             }
         });
     });
-
-    // ── 自动刷新（缓存超过 10 分钟时后台静默拉取，完成后刷新页面） ──
-    (function(){
-        var root = document.getElementById('abs-root');
-        var cachedAt = parseInt((root && root.dataset.cachedAt) || '0', 10);
-        var now = Math.floor(Date.now() / 1000);
-        if (cachedAt > 0 && now - cachedAt >= 600) {
-            absPost('refresh', {}, function(res){
-                if (res.code === 0) {
-                    location.reload();
-                }
-                // 静默失败：不弹任何提示，等用户手动点刷新
-            });
-        }
-    })();
 
     // ── 排序 ──
     var sortSel = document.getElementById('abs-sort-sel');
