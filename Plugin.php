@@ -5,7 +5,7 @@
  *
  * @package   AB-Store
  * @author    LHL
- * @version   1.0.9
+ * @version   1.0.10
  * @link      https://github.com/lhl77/Typecho-Plugin-AdminBeautifyStore
  */
 
@@ -131,10 +131,6 @@ class AdminBeautifyStore_Plugin implements Typecho_Plugin_Interface
         // 将已安装的仓库内插件版本信息传递给前端
         $installedMap = self::buildInstalledVersionMap();
 
-        // 读取缓存时间戳（用于前端判断是否需要自动刷新）
-        $registry = self::loadCachedRegistry();
-        $cachedAt = isset($registry['_cached_at']) ? intval($registry['_cached_at']) : 0;
-
         echo '<script>';
         echo 'window.__ABS_CFG__=' . json_encode(array(
             'ajaxUrl'       => $ajaxUrl,
@@ -143,25 +139,7 @@ class AdminBeautifyStore_Plugin implements Typecho_Plugin_Interface
             'installedMap'  => $installedMap,
             'activatedMap'  => self::buildActivatedMap(),
             'storeUrl'      => Typecho_Common::url('/admin/extending.php?panel=' . urlencode('AdminBeautifyStore/Panel.php'), $options->index),
-            'cachedAt'      => $cachedAt,
         ), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . ';';
-        // 非 Store 页面：缓存超过 10 分钟时静默更新缓存，不刷新页面
-        echo <<<'JS'
-(function(){
-    var cfg = window.__ABS_CFG__ || {};
-    if (!cfg.ajaxUrl || !cfg.token) return;
-    // Store 页面有自己的自动刷新逻辑（带页面重载），此处跳过
-    if (document.getElementById('abs-root')) return;
-    var cachedAt = cfg.cachedAt || 0;
-    var now = Math.floor(Date.now() / 1000);
-    if (cachedAt > 0 && now - cachedAt >= 600) {
-        var body = new FormData();
-        body.append('do', 'refresh');
-        body.append('_', cfg.token);
-        fetch(cfg.ajaxUrl, {method:'POST', body:body}).catch(function(){});
-    }
-})();
-JS;
         echo '</script>';
 
         $assetBase = Typecho_Common::url('AdminBeautifyStore/assets/', $options->pluginUrl);
