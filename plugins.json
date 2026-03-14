@@ -45,7 +45,7 @@
       "directory": "TelegramNotice",
       "subDirectory": "TelegramNotice",
       "branch": "main",
-      "downloadUrl": "https://github.com/lhl77/Typecho-Plugin-TelegramNotice/archive/refs/heads/main.zip",
+      "downloadUrl": "https://github.com/lhl77/Typecho-Plugin-TelegramNotice/releases/download/v1.1.1/TelegramNotice.zip",
       "homepage": "https://github.com/lhl77/Typecho-Plugin-TelegramNotice",
       "tags": ["通知推送", "Telegram", "评论"],
       "changelog": "https://github.com/lhl77/Typecho-Plugin-TelegramNotice/releases"
