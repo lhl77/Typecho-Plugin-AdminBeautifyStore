@@ -5,7 +5,7 @@
  *
  * @package   AB-Store
  * @author    LHL
- * @version   1.0.7
+ * @version   1.0.8
  * @link      https://github.com/lhl77/Typecho-Plugin-AdminBeautifyStore
  */
 
@@ -291,7 +291,17 @@ class AdminBeautifyStore_Plugin implements Typecho_Plugin_Interface
             $isActivated  = $isInstalled && isset($activatedMap[$pdir]);
             $localVer     = $isInstalled && isset($installedMap[$pdir]) ? $installedMap[$pdir] : '';
             $hasUpdate    = $isInstalled && $pver && $localVer && version_compare($pver, $localVer, '>');
-            $settingsUrl  = $isActivated
+            // 是否为自身（禁用/卸载自身会产生循环依赖，需特殊处理）
+            $isSelf       = ($pdir === 'AdminBeautifyStore');
+            // 只对已激活且类存在 config() 方法的插件显示"设置"按钮
+            $hasConfig    = false;
+            if ($isActivated) {
+                $pluginClass = $pdir . '_Plugin';
+                if (class_exists($pluginClass) && method_exists($pluginClass, 'config')) {
+                    $hasConfig = true;
+                }
+            }
+            $settingsUrl  = $hasConfig
                 ? Typecho_Common::url('/admin/options-plugin.php?config=' . urlencode($pdir), $options->index)
                 : '';
             $cardClass = 'abs-card';
@@ -378,9 +388,16 @@ class AdminBeautifyStore_Plugin implements Typecho_Plugin_Interface
                         <span class="abs-icon">system_update</span>升级
                     </button>
                     <?php if ($isActivated): ?>
+                    <?php if ($settingsUrl): ?>
                     <a href="<?php echo htmlspecialchars($settingsUrl); ?>" class="abs-btn abs-btn-text" title="插件设置">
                         <span class="abs-icon">settings</span>设置
                     </a>
+                    <?php endif; ?>
+                    <?php if ($isSelf): ?>
+                    <a href="<?php echo htmlspecialchars($pluginsUrl); ?>" class="abs-btn abs-btn-text" title="在 Typecho 插件管理页禁用或卸载">
+                        <span class="abs-icon">open_in_new</span>管理
+                    </a>
+                    <?php else: ?>
                     <button class="abs-btn abs-btn-text abs-action-btn"
                             data-action="disable"
                             data-id="<?php echo htmlspecialchars($pid); ?>"
@@ -388,7 +405,8 @@ class AdminBeautifyStore_Plugin implements Typecho_Plugin_Interface
                         <span class="abs-icon">pause_circle_outline</span>禁用
                     </button>
                     <?php endif; ?>
-                    <?php if (!$isActivated): ?>
+                    <?php endif; ?>
+                    <?php if (!$isActivated && !$isSelf): ?>
                     <button class="abs-btn abs-btn-text abs-action-btn abs-btn-danger-text"
                             data-action="uninstall"
                             data-id="<?php echo htmlspecialchars($pid); ?>"
@@ -398,15 +416,23 @@ class AdminBeautifyStore_Plugin implements Typecho_Plugin_Interface
                     <?php endif; ?>
                     <?php elseif ($isInstalled): ?>
                     <?php if ($isActivated): ?>
+                    <?php if ($settingsUrl): ?>
                     <a href="<?php echo htmlspecialchars($settingsUrl); ?>" class="abs-btn abs-btn-text" title="插件设置">
                         <span class="abs-icon">settings</span>设置
                     </a>
+                    <?php endif; ?>
+                    <?php if ($isSelf): ?>
+                    <a href="<?php echo htmlspecialchars($pluginsUrl); ?>" class="abs-btn abs-btn-text" title="在 Typecho 插件管理页禁用或卸载">
+                        <span class="abs-icon">open_in_new</span>管理
+                    </a>
+                    <?php else: ?>
                     <button class="abs-btn abs-btn-tonal abs-action-btn"
                             data-action="disable"
                             data-id="<?php echo htmlspecialchars($pid); ?>"
                             data-dir="<?php echo htmlspecialchars($pdir); ?>">
                         <span class="abs-icon">pause_circle_outline</span>禁用
                     </button>
+                    <?php endif; ?>
                     <?php else: ?>
                     <button class="abs-btn abs-btn-filled abs-action-btn"
                             data-action="enable"
@@ -414,12 +440,14 @@ class AdminBeautifyStore_Plugin implements Typecho_Plugin_Interface
                             data-dir="<?php echo htmlspecialchars($pdir); ?>">
                         <span class="abs-icon">play_circle_outline</span>启用
                     </button>
+                    <?php if (!$isSelf): ?>
                     <button class="abs-btn abs-btn-text abs-action-btn abs-btn-danger-text"
                             data-action="uninstall"
                             data-id="<?php echo htmlspecialchars($pid); ?>"
                             data-dir="<?php echo htmlspecialchars($pdir); ?>">
                         <span class="abs-icon">delete_outline</span>卸载
                     </button>
+                    <?php endif; ?>
                     <?php endif; ?>
                     <?php else: ?>
                     <button class="abs-btn abs-btn-filled abs-action-btn"
@@ -601,7 +629,10 @@ class AdminBeautifyStore_Plugin implements Typecho_Plugin_Interface
         var branch  = btn.dataset.branch  || 'main';
         var subdir  = btn.dataset.subdir  || '';
         var downloadUrl = btn.dataset.downloadurl || '';
-        var name    = btn.closest('.abs-card').querySelector('.abs-card-name').textContent;
+        var cardEl  = btn.closest('.abs-card');
+        var name    = cardEl && cardEl.querySelector('.abs-card-name')
+                      ? cardEl.querySelector('.abs-card-name').textContent
+                      : (dir || id || '');
 
         if(action === 'install'){
             showProgress('正在安装 ' + name + '…');
