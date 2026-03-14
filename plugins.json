@@ -8,7 +8,7 @@
       "description": "Typecho 插件管理，与AdminBeautify配套使用",
       "author": "LHL",
       "authorUrl": "https://blog.lhl.one",
-      "version": "1.1.0",
+      "version": "1.0.9",
       "repo": "lhl77/Typecho-Plugin-AdminBeautifyStore",
       "directory": "AdminBeautifyStore",
       "subDirectory": "",
