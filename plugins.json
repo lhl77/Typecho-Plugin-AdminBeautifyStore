@@ -1,6 +1,6 @@
 {
   "schema": "1.0",
-  "updated": "2026-03-14T09:28:57Z",
+  "updated": "2026-03-15T16:03:57Z",
   "plugins": [
     {
       "id": "AB-Store",
@@ -72,7 +72,7 @@
       "description": "Notice 是 Typecho 评论通知插件，支持 SMTP、Server酱、Qmsg酱、Telegram等接口，均采用异步方式发送",
       "author": "MZRME",
       "authorUrl": "https://mzrme.com",
-      "version": "1.1.1",
+      "version": "2.0.0",
       "repo": "imzrme/Typecho-Plugin-Notice",
       "directory": "Notice",
       "subDirectory": "",
