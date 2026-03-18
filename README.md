@@ -1,5 +1,3 @@
-![](https://i.see.you/2026/03/13/e0Tx/0e1e75b9b979f3b800dee577a9436ec8.jpg)
-
 <h1 align="center">AB 插件仓库</h1>
 <p align="center">
   <img src="https://img.shields.io/badge/Typecho->=1.3.0-orange?style=flat-square" alt="Typecho 1.3.0">
@@ -47,3 +45,7 @@
 3.填写`downloadUrl`时,一般需要配置`subDirectory`
 
 4.`subDirectory`仅支持一级目录,不支持添加子目录(不然你下载的`zip`存在冗余信息浪费带宽)
+
+|截图|
+|---|
+|![](https://i.see.you/2026/03/13/e0Tx/0e1e75b9b979f3b800dee577a9436ec8.jpg)|
