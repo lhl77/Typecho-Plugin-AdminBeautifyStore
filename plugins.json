@@ -1,10 +1,10 @@
 {
   "schema": "1.0",
-  "updated": "2026-03-18T10:42:58Z",
+  "updated": "2026-03-18T10:43:34Z",
   "plugins": [
     {
       "id": "AB-Store",
-      "name": "🧩 AB 插件仓库",
+      "name": "AB 插件仓库",
       "description": "Typecho 插件管理，与AdminBeautify配套使用",
       "author": "LHL",
       "authorUrl": "https://blog.lhl.one",
@@ -96,7 +96,7 @@
       "downloadUrl": "https://github.com/lhl77/Typecho-Plugin-AdminBeautifyStore/releases/download/%E6%8F%92%E4%BB%B6%E4%BB%93%E5%BA%93ZIP%E5%8C%85/BingIndexNow_v1.3.1.zip",
       "homepage": "https://github.com/ID521101/BingIndexNow",
       "tags": ["SEO"],
-      "changelog": "https://github.com/ID521101/BingIndexNow"
+      "changelog": "https://github.com/ID521101/BingIndexNow/releases"
     },
     {
       "id": "Sitemap",
