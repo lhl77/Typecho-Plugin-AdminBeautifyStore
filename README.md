@@ -41,6 +41,7 @@
 |changelog|	❌	|更新日志链接（目前仅存储，未使用）|
 
 </div>
+
 ### 注意事项
 1.`downloadUrl`不填默认获取`repo`内`{branch}`分支的内容，不考虑版本号
 2.如果按照版本号分发请填写`downloadUrl`,如:`https://github.com/lhl77/Typecho-Plugin-AdminBeautify/archive/refs/tags/v2.1.16.zip`
