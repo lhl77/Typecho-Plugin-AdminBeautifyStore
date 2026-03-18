@@ -1,11 +1,10 @@
 <h1 align="center">AB 插件仓库</h1>
 <p align="center">
-  <a href="https://github.com/lhl77/Typecho-Plugin-AdminBeautify/releases"><img src="https://img.shields.io/github/v/release/lhl77/Typecho-Plugin-AdminBeautify?style=flat-square&label=release&color=blue" alt="Latest Release"></a>
   <img src="https://img.shields.io/badge/Typecho->=1.3.0-orange?style=flat-square" alt="Typecho 1.3.0">
   <img src="https://img.shields.io/badge/PHP-%3E%3D7.2-777BB4?style=flat-square&logo=php&logoColor=white" alt="PHP >= 7.2">
   <img src="https://img.shields.io/badge/design-Material%20Design%203-6750A4?style=flat-square&logo=materialdesign&logoColor=white" alt="Material Design 3">
-  <a href="https://github.com/lhl77/Typecho-Plugin-AdminBeautify/stargazers"><img src="https://img.shields.io/github/stars/lhl77/Typecho-Plugin-AdminBeautify?style=flat-square&logo=github" alt="GitHub Stars"></a>
-  <a href="https://github.com/lhl77/Typecho-Plugin-AdminBeautify/network/members"><img src="https://img.shields.io/github/forks/lhl77/Typecho-Plugin-AdminBeautify?style=flat-square&logo=github" alt="GitHub Forks"></a>
+  <a href="https://github.com/lhl77/Typecho-Plugin-AdminBeautifyStore/stargazers"><img src="https://img.shields.io/github/stars/lhl77/Typecho-Plugin-AdminBeautifyStore?style=flat-square&logo=github" alt="GitHub Stars"></a>
+  <a href="https://github.com/lhl77/Typecho-Plugin-AdminBeautifyStore/network/members"><img src="https://img.shields.io/github/forks/lhl77/Typecho-Plugin-AdminBeautifyStore?style=flat-square&logo=github" alt="GitHub Forks"></a>
 </p>
 
 <p align="center">
