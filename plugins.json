@@ -1,6 +1,6 @@
 {
   "schema": "1.0",
-  "updated": "2026-03-18T01:58:09Z",
+  "updated": "2026-03-18T02:16:25Z",
   "plugins": [
     {
       "id": "AB-Store",
@@ -129,6 +129,22 @@
       "homepage": "https://github.com/jrotty/CommentNotifier",
       "tags": ["通知推送","邮件","评论"],
       "changelog": "https://github.com/jrotty/CommentNotifier/releases"
+    },
+    {
+      "id": "SmartGallery",
+      "name": "Smart Gallery",
+      "description": "一款专为 Typecho 设计的现代相册管理插件",
+      "author": "落花雨记",
+      "authorUrl": "https://www.luohuayu.cn",
+      "version": "1.1.1",
+      "repo": "3554171776/Smart-Gallery",
+      "directory": "SmartGallery",
+      "subDirectory": "",
+      "branch": "main",
+      "downloadUrl": "",
+      "homepage": "https://github.com/3554171776/Smart-Gallery",
+      "tags": ["内容","相册","短代码"],
+      "changelog": "https://github.com/3554171776/Smart-Gallery/releases"
     }
   ]
 }
