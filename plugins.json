@@ -177,6 +177,22 @@
       "homepage": "https://blog.zeruns.com/archives/931.html",
       "tags": ["AI","评论"],
       "changelog": "https://github.com/zeruns/CommentAI"
+    },
+    {
+      "id": "QQPush-lele",
+      "name": "QQPush",
+      "description": "QQ群文章推送插件",
+      "author": "阿乐",
+      "authorUrl": "https://www.leleweb.cn",
+      "version": "1.0.1",
+      "repo": "",
+      "directory": "QQPush",
+      "subDirectory": "QQPush",
+      "branch": "",
+      "downloadUrl": "https://github.com/lhl77/Typecho-Plugin-AdminBeautifyStore/releases/download/%E6%8F%92%E4%BB%B6%E4%BB%93%E5%BA%93ZIP%E5%8C%85/QQPush_v1.0.1.zip",
+      "homepage": "https://bbs.leleweb.cn/archives/261.html",
+      "tags": ["通知推送","QQ"],
+      "changelog": "https://bbs.leleweb.cn/archives/261.html"
     }
   ]
 }
