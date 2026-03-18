@@ -9,7 +9,7 @@
 
 <p align="center">
   <strong>Admin Beautify 主题美化插件 - 专用插件库</strong><br/>
-  Admin Beautify： [lhl77/Typecho-Plugin-AdminBeautify](https://github.com/lhl77/Typecho-Plugin-AdminBeautify)
+  Admin Beautify： <a href="https://github.com/lhl77/Typecho-Plugin-AdminBeautify">lhl77/Typecho-Plugin-AdminBeautify</a>
 </p>
 
 ---
