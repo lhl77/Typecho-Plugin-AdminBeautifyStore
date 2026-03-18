@@ -1,6 +1,6 @@
 {
   "schema": "1.0",
-  "updated": "2026-03-18T03:20:08Z",
+  "updated": "2026-03-18T03:30:08Z",
   "plugins": [
     {
       "id": "AB-Store",
@@ -157,7 +157,7 @@
       "directory": "Vditor_for_Typecho",
       "subDirectory": "Vditor_for_Typecho",
       "branch": "main",
-      "downloadUrl": "https://github.com/0LIE1/Vditor_for_Typecho/archive/refs/heads/main.zip",
+      "downloadUrl": "https://github.com/lhl77/Typecho-Plugin-AdminBeautifyStore/releases/download/%E6%8F%92%E4%BB%B6%E4%BB%93%E5%BA%93ZIP%E5%8C%85/Vditor_for_Typecho_v1.0.0.zip",
       "homepage": "https://github.com/0LIE1/Vditor_for_Typecho",
       "tags": ["编辑器","Vditor"],
       "changelog": "https://github.com/0LIE1/Vditor_for_Typecho"
