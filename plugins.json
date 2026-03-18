@@ -1,6 +1,6 @@
 {
   "schema": "1.0",
-  "updated": "2026-03-18T02:41:55Z",
+  "updated": "2026-03-18T03:18:08Z",
   "plugins": [
     {
       "id": "AB-Store",
@@ -145,6 +145,22 @@
       "homepage": "https://github.com/3554171776/Smart-Gallery",
       "tags": ["内容","相册","短代码"],
       "changelog": "https://github.com/3554171776/Smart-Gallery/releases"
-    }
+    },
+    {
+      "id": "Vditor_for_Typecho",
+      "name": "Vditor for Typecho",
+      "description": "Vditor for Typecho 是一个面向 Typecho 的前台渲染增强插件。它不会接管后台编辑器，而是保留 Typecho 原有的 PHP Markdown 渲染流程，在前台文章页为 Markdown 内容补充更完整的展示能力和更现代的视觉样式。",
+      "author": "0LIE1 (Codex)",
+      "authorUrl": "https://github.com/0LIE1/Vditor_for_Typecho",
+      "version": "1.0.0",
+      "repo": "0LIE1/Vditor_for_Typecho",
+      "directory": "Vditor_for_Typecho",
+      "subDirectory": "Vditor_for_Typecho",
+      "branch": "main",
+      "downloadUrl": "https://github.com/0LIE1/Vditor_for_Typecho/archive/refs/heads/main.zip",
+      "homepage": "https://github.com/0LIE1/Vditor_for_Typecho",
+      "tags": ["编辑器","Vditor"],
+      "changelog": "https://github.com/0LIE1/Vditor_for_Typecho"
+    },
   ]
 }
