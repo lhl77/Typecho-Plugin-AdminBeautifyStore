@@ -1,6 +1,6 @@
 {
   "schema": "1.0",
-  "updated": "2026-03-18T03:59:20Z",
+  "updated": "2026-03-18T07:49:12Z",
   "plugins": [
     {
       "id": "AB-Store",
@@ -145,6 +145,22 @@
       "homepage": "https://github.com/3554171776/Smart-Gallery",
       "tags": ["内容","相册","短代码"],
       "changelog": "https://github.com/3554171776/Smart-Gallery/releases"
+    },
+    {
+      "id": "ueditor-plus-typecho",
+      "name": "UEditor+ for Typecho",
+      "description": "基于ueditor+ueditor-plus 编辑器，适配了typecho，支持腾讯云和又拍云. ",
+      "author": "地主非",
+      "authorUrl": "https://github.com/jian27com",
+      "version": "1.0",
+      "repo": "jian27com/ueditor-plus-typecho",
+      "directory": "UEditor",
+      "subDirectory": "",
+      "branch": "main",
+      "downloadUrl": "",
+      "homepage": "https://www.myhelen.cn/helen/112.htm",
+      "tags": ["编辑器"],
+      "changelog": "https://github.com/jian27com/ueditor-plus-typecho"
     }
   ]
 }
