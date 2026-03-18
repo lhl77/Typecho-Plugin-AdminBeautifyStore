@@ -1,3 +1,5 @@
+![](https://i.see.you/2026/03/13/e0Tx/0e1e75b9b979f3b800dee577a9436ec8.jpg)
+
 <h1 align="center">AB 插件仓库</h1>
 <p align="center">
   <img src="https://img.shields.io/badge/Typecho->=1.3.0-orange?style=flat-square" alt="Typecho 1.3.0">
@@ -12,11 +14,6 @@
   Admin Beautify： <a href="https://github.com/lhl77/Typecho-Plugin-AdminBeautify" target="_blank">lhl77/Typecho-Plugin-AdminBeautify</a>
 </p>
 
----
-
-|![](https://i.see.you/2026/03/13/e0Tx/0e1e75b9b979f3b800dee577a9436ec8.jpg)|
-|---|
-|<p align="center">截图</p>|
 
 <div align="center">
 <h2>投稿</h2>
