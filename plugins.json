@@ -1,6 +1,6 @@
 {
   "schema": "1.0",
-  "updated": "2026-03-18T07:49:12Z",
+  "updated": "2026-03-18T09:31:09Z",
   "plugins": [
     {
       "id": "AB-Store",
@@ -161,6 +161,22 @@
       "homepage": "https://www.myhelen.cn/helen/112.htm",
       "tags": ["编辑器"],
       "changelog": "https://github.com/jian27com/ueditor-plus-typecho"
+    },
+    {
+      "id": "CommentAI-zeruns",
+      "name": "CommentAI (Zeruns版)",
+      "description": "AI 智能评论审核&回复插件 (Zeruns's Fork)",
+      "author": "原作者:璇",
+      "authorUrl": "https://github.com/BXCQ",
+      "version": "1.5.1",
+      "repo": "zeruns/CommentAI",
+      "directory": "CommentAI",
+      "subDirectory": "CommentAI",
+      "branch": "master",
+      "downloadUrl": "https://github.com/lhl77/Typecho-Plugin-AdminBeautifyStore/releases/download/%E6%8F%92%E4%BB%B6%E4%BB%93%E5%BA%93ZIP%E5%8C%85/CommentAI_v1.5.1.zip",
+      "homepage": "https://blog.zeruns.com/archives/931.html",
+      "tags": ["AI","评论"],
+      "changelog": "https://github.com/zeruns/CommentAI"
     }
   ]
 }
