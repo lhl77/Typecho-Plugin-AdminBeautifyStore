@@ -1,6 +1,6 @@
 {
   "schema": "1.0",
-  "updated": "2026-03-18T09:41:39Z",
+  "updated": "2026-03-18T09:42:31Z",
   "plugins": [
     {
       "id": "AB-Store",
@@ -185,10 +185,10 @@
       "author": "阿乐",
       "authorUrl": "https://www.leleweb.cn",
       "version": "1.0.1",
-      "repo": "",
+      "repo": "lhl77/Typecho-Plugin-AdminBeautifyStore",
       "directory": "QQPush",
       "subDirectory": "QQPush",
-      "branch": "",
+      "branch": "main",
       "downloadUrl": "https://github.com/lhl77/Typecho-Plugin-AdminBeautifyStore/releases/download/%E6%8F%92%E4%BB%B6%E4%BB%93%E5%BA%93ZIP%E5%8C%85/QQPush_v1.0.1.zip",
       "homepage": "https://bbs.leleweb.cn/archives/261.html",
       "tags": ["通知推送","QQ"],
