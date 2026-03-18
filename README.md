@@ -42,8 +42,11 @@
 
 </div>
 
-### 注意事项
+### ❗注意事项❗
 1.`downloadUrl`不填默认获取`repo`内`{branch}`分支的内容，不考虑版本号
+
 2.如果按照版本号分发请填写`downloadUrl`,如:`https://github.com/lhl77/Typecho-Plugin-AdminBeautify/archive/refs/tags/v2.1.16.zip`
+
 3.填写`downloadUrl`时,一般需要配置`subDirectory`
+
 4.`subDirectory`仅支持一级目录,不支持添加子目录(不然你下载的`zip`存在冗余信息浪费带宽)
