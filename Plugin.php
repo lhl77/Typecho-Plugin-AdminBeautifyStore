@@ -5,7 +5,7 @@
  *
  * @package   AB-Store
  * @author    LHL
- * @version   1.0.14
+ * @version   1.0.15
  * @link      https://github.com/lhl77/Typecho-Plugin-AdminBeautifyStore
  */
 
@@ -545,6 +545,12 @@ JS;
     var CFG = window.__ABS_CFG__ || {};
     var ajaxUrl = document.getElementById('abs-root').dataset.ajax;
     var token   = document.getElementById('abs-root').dataset.token;
+
+    // ── 将 overlay 移到 body，避免祖先 transform 破坏 position:fixed 定位 ──
+    ['abs-progress', 'abs-uninstall-dialog'].forEach(function(id){
+        var el = document.getElementById(id);
+        if (el && el.parentNode !== document.body) document.body.appendChild(el);
+    });
 
     // ── 工具函数 ──
     function absNavigate(url){
