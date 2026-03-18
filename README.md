@@ -14,9 +14,10 @@
 
 ---
 
+|![](https://i.see.you/2026/03/13/e0Tx/0e1e75b9b979f3b800dee577a9436ec8.jpg)|
+|---|
+|<p align="center">截图</p>|
 
-
-![](https://i.see.you/2026/03/13/e0Tx/0e1e75b9b979f3b800dee577a9436ec8.jpg)
 
 ## 投稿
 
