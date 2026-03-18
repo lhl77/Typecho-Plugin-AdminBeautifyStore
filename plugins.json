@@ -1,6 +1,6 @@
 {
   "schema": "1.0",
-  "updated": "2026-03-18T03:39:20Z",
+  "updated": "2026-03-18T03:46:20Z",
   "plugins": [
     {
       "id": "AB-Store",
@@ -148,7 +148,7 @@
     },
     {
       "id": "Vditor_for_Typecho",
-      "name": "(仅前台) Vditor for Typecho",
+      "name": "Vditor (仅前台渲染)",
       "description": "Vditor for Typecho 是一个面向 Typecho 的前台渲染增强插件。它不会接管后台编辑器，而是保留 Typecho 原有的 PHP Markdown 渲染流程，在前台文章页为 Markdown 内容补充更完整的展示能力和更现代的视觉样式。",
       "author": "0LIE1 (Codex)",
       "authorUrl": "https://github.com/0LIE1/Vditor_for_Typecho",
