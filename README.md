@@ -18,8 +18,8 @@
 |---|
 |<p align="center">截图</p>|
 
-
-## 投稿
+<div align="center">
+<h2>投稿</h2>
 
 直接发issue或提交PR即可，修改`plugins.json`添加你的插件信息。
 
@@ -31,7 +31,7 @@
 |directory|	✅	|安装到 plugins/ 下的目录名|
 |version|	✅	|最新版本号（用于更新检测）|
 |branch|	❌	|默认 main，需要时填 master 等|
-|subDirectory|	❌|	monorepo 时填插件所在子目录名|
+|subDirectory|	❌|	downloadUrl解压后`Plugin.php`所在子目录名|
 |downloadUrl|	❌	|有直链时优先用此 URL（monorepo 必填）|
 |author|	❌|	作者名|
 |authorUrl|	❌|	作者主页|
@@ -40,5 +40,9 @@
 |tags|	❌	|标签数组，用于筛选|
 |changelog|	❌	|更新日志链接（目前仅存储，未使用）|
 
-需要 downloadUrl + subDirectory 的情况（monorepo，如 typecho-fans）：
-monorepo 的 archive ZIP 太大（含几十上百个插件），必须用 Release 直链
+</div>
+### 注意事项
+1.`downloadUrl`不填默认获取`repo`内`{branch}`分支的内容，不考虑版本号
+2.如果按照版本号分发请填写`downloadUrl`,如:`https://github.com/lhl77/Typecho-Plugin-AdminBeautify/archive/refs/tags/v2.1.16.zip`
+3.填写`downloadUrl`时,一般需要配置`subDirectory`
+4.`subDirectory`仅支持一级目录,不支持添加子目录(不然你下载的`zip`存在冗余信息浪费带宽)
