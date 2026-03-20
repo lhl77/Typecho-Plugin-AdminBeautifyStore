@@ -1,6 +1,6 @@
 {
   "schema": "1.0",
-  "updated": "2026-03-18T10:43:34Z",
+  "updated": "2026-03-20T11:16:00Z",
   "plugins": [
     {
       "id": "AB-Store",
@@ -193,6 +193,22 @@
       "homepage": "https://bbs.leleweb.cn/archives/261.html",
       "tags": ["通知推送","QQ"],
       "changelog": "https://bbs.leleweb.cn/archives/261.html"
+    },
+    {
+      "id": "picup",
+      "name": "PicUp for Typecho",
+      "description": "多存储后端图片上传&处理插件，支持多种远程存储服务，支持上传前图片处理，多 Profile 通过 JSON 存储，可随时切换。 ",
+      "author": "LHL",
+      "authorUrl": "https://blog.lhl.one",
+      "version": "1.0.0",
+      "repo": "lhl77/Typecho-Plugin-PicUp",
+      "directory": "PicUp",
+      "subDirectory": "PicUp",
+      "branch": "main",
+      "downloadUrl": "https://github.com/lhl77/Typecho-Plugin-PicUp/releases/download/v1.0.0/PicUp.zip",
+      "homepage": "https://blog.lhl.one/artical/1026.html",
+      "tags": ["图床","图片处理"],
+      "changelog": "https://github.com/lhl77/Typecho-Plugin-PicUp/releases"
     }
   ]
 }
