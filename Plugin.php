@@ -5,7 +5,7 @@
  *
  * @package   AB-Store
  * @author    LHL
- * @version   1.0.15
+ * @version   1.0.16
  * @link      https://github.com/lhl77/Typecho-Plugin-AdminBeautifyStore
  */
 
@@ -152,30 +152,8 @@ class AdminBeautifyStore_Plugin implements Typecho_Plugin_Interface
         // 所有后台页面：缓存超过 10 分钟时静默刷新；Store 页额外触发页面重载以更新展示
         echo <<<'JS'
 (function(){
-    var cfg = window.__ABS_CFG__ || {};
-    if (!cfg.ajaxUrl || !cfg.token) return;
-    var cachedAt = cfg.cachedAt || 0;
-    var now = Math.floor(Date.now() / 1000);
-    // 用 localStorage 记录客户端上次发起刷新的时间，避免同一窗口内多个页面重复触发
-    var lsKey = 'abs_last_refresh';
-    var lastRefresh = 0;
-    try { lastRefresh = parseInt(localStorage.getItem(lsKey) || '0', 10); } catch(e) {}
-    var effectiveAge = Math.max(cachedAt, lastRefresh); // 取服务端/客户端中更新的那个
-    if (effectiveAge > 0 && now - effectiveAge < 600) return; // 10 分钟内已刷新，跳过
-    var body = new FormData();
-    body.append('do', 'refresh');
-    body.append('_', cfg.token);
-    fetch(cfg.ajaxUrl, {method:'POST', body:body})
-        .then(function(r){ return r.json(); })
-        .then(function(res){
-            if (res.code !== 0) return;
-            try { localStorage.setItem(lsKey, String(Math.floor(Date.now() / 1000))); } catch(e) {}
-            // Store 页面需要重载以更新卡片展示
-            if (document.getElementById('abs-root')) {
-                location.reload();
-            }
-        })
-        .catch(function(){});
+    // 前端自动刷新已移至 update-check.js（调用 checkUpdates，服务端 stale-while-revalidate 负责后台续期缓存）
+    // 此处仅保留空函数，以防旧版 JS 引用
 })();
 JS;
         echo '</script>';
@@ -599,7 +577,7 @@ JS;
     // ── 刷新列表 ──
     document.getElementById('abs-refresh-btn').addEventListener('click', function(){
         showProgress('正在从 GitHub 拉取最新插件列表…');
-        absPost('refresh', {}, function(res){
+        absPost('refresh', {force: '1'}, function(res){
             hideProgress();
             if(res.code === 0){
                 absToast('插件列表已更新', 'success');
@@ -813,13 +791,7 @@ JS;
     {
         $file = self::cacheFile();
         if (!file_exists($file)) {
-            // 首次访问时尝试立即拉取
-            $remote = self::fetchRemoteRegistry();
-            if ($remote) {
-                $remote['_cached_at'] = time();
-                @file_put_contents($file, json_encode($remote, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
-                return $remote;
-            }
+            // 无缓存时返回空结构，由后台 stale-while-revalidate 异步填充，避免阻塞页面
             return array('plugins' => array());
         }
         $data = @json_decode(file_get_contents($file), true);
@@ -844,14 +816,39 @@ JS;
     }
 
     /**
-     * 从远端拉取最新 JSON
+     * 从远端拉取最新 JSON（支持 GitHub 镜像兜底，每节点 8s 超时）
      */
     public static function fetchRemoteRegistry()
     {
-        $url = self::getRegistryUrl();
+        $baseUrl = self::getRegistryUrl();
+
+        // jsDelivr CDN 无需镜像，直接请求（timeout 适当放宽到 16s）
+        if (strpos($baseUrl, 'jsdelivr.net') !== false) {
+            return self::_httpGetJson($baseUrl, 16);
+        }
+
+        // raw.githubusercontent.com → 依次尝试直连 + 镜像代理
+        $mirrors = array(
+            '',                       // 直连（优先）
+            'https://gh-proxy.top/',
+            'https://ghfast.top/',
+            'https://ghproxy.com/',
+        );
+        foreach ($mirrors as $prefix) {
+            $data = self::_httpGetJson($prefix . $baseUrl, 8);
+            if ($data !== null) return $data;
+        }
+        return null;
+    }
+
+    /**
+     * 内部工具：HTTP GET 拉取 JSON，失败返回 null
+     */
+    private static function _httpGetJson($url, $timeout = 8)
+    {
         $ctx = stream_context_create(array(
             'http' => array(
-                'timeout'    => 15,
+                'timeout'    => $timeout,
                 'user_agent' => 'AB-Store/1.0 Typecho-Plugin (+https://github.com/lhl77/Typecho-Plugin-AdminBeautifyStore)',
                 'header'     => "Accept: application/json\r\nCache-Control: no-cache\r\n",
             ),
@@ -861,7 +858,7 @@ JS;
             ),
         ));
         $raw = @file_get_contents($url, false, $ctx);
-        if (!$raw) return null;
+        if (!$raw || strlen($raw) < 10) return null;
         $data = @json_decode($raw, true);
         return is_array($data) ? $data : null;
     }

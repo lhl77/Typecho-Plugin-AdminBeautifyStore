@@ -1,6 +1,11 @@
 /**
  * AB-Store 后台自动更新检测
  * 每次加载后台页脚时运行，若有更新则通过 AdminBeautify 的通知系统（abShowUpdateToast）告知用户
+ *
+ * 服务端 handleCheckUpdates() 实现 stale-while-revalidate：
+ *   - 立即返回缓存结果（非阻塞）
+ *   - 若缓存已过期，则在连接关闭后后台异步续期
+ *   - 前端收到 cache_stale=true 时，15s 后再发一次请求获取刷新后的结果
  */
 (function () {
     'use strict';
@@ -25,13 +30,19 @@
     }
 
     // ── 执行检测 ──
-    function runCheck() {
+    function runCheck(isRetry) {
         var installed = CFG.installedMap || {};
         if (Object.keys(installed).length === 0) return;
 
         absPost('checkUpdates', {}, function (res) {
-            if (res && res.code === 0 && res.data && res.data.hasUpdates) {
-                notifyUpdates(res.data.updates || [], res.data.count || 0);
+            if (res && res.code === 0 && res.data) {
+                if (res.data.hasUpdates) {
+                    notifyUpdates(res.data.updates || [], res.data.count || 0);
+                }
+                // 缓存刚刚被后台续期，15s 后重新拉取最新更新状态（只重试一次）
+                if (res.data.cache_stale && !isRetry) {
+                    setTimeout(function () { runCheck(true); }, 15000);
+                }
             }
         });
     }

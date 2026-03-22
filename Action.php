@@ -240,59 +240,151 @@ class AdminBeautifyStore_Action extends Typecho_Widget implements Widget_Interfa
     }
 
     /**
-     * 强制刷新远程 JSON 缓存
+     * 刷新远程 JSON 缓存
+     *
+     * force=1（手动"刷新列表"按钮）：释放 Session → 同步请求 GitHub（含镜像兜底）→ 返回结果
+     * 无 force（自动后台刷新）     ：立即返回当前缓存条数，后台异步拉取（stale-while-revalidate）
      */
     private function handleRefresh()
     {
         $this->checkAdmin();
 
-        $data = AdminBeautifyStore_Plugin::fetchRemoteRegistry();
-        if (!$data) {
-            $this->jsonError('无法获取远程数据，请检查服务器网络或 GitHub 是否可访问', 502);
-        }
-        $data['_cached_at'] = time();
+        $force     = ($this->request->get('force', '0') === '1');
         $cacheFile = AdminBeautifyStore_Plugin::cacheFile();
-        $saved = @file_put_contents($cacheFile, json_encode($data, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
-        if ($saved === false) {
-            $this->jsonError('缓存写入失败，请检查 plugins/AdminBeautifyStore 目录写权限', 500);
+        $lockFile  = dirname($cacheFile) . DIRECTORY_SEPARATOR . '.refresh_lock';
+        $cacheDir  = dirname($cacheFile);
+
+        if ($force) {
+            // 手动刷新：先释放 Session 锁，再同步拉取
+            if (session_status() === PHP_SESSION_ACTIVE) {
+                @session_write_close();
+            }
+            $data = AdminBeautifyStore_Plugin::fetchRemoteRegistry();
+            if (!$data) {
+                $this->jsonError('无法获取远程数据，请检查服务器网络或 GitHub 是否可访问', 502);
+            }
+            $data['_cached_at'] = time();
+            if (!is_dir($cacheDir)) @mkdir($cacheDir, 0755, true);
+            $saved = @file_put_contents($cacheFile, json_encode($data, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
+            if ($saved === false) {
+                $this->jsonError('缓存写入失败，请检查 plugins/AdminBeautifyStore 目录写权限', 500);
+            }
+            @unlink($lockFile); // 清除可能残留的后台锁
+            $count = isset($data['plugins']) ? count($data['plugins']) : 0;
+            $this->jsonSuccess(array('count' => $count, 'updated' => isset($data['updated']) ? $data['updated'] : ''), "已拉取 {$count} 个插件");
+            return; // jsonSuccess 内部会 exit，此处仅作安全保障
         }
-        $count = isset($data['plugins']) ? count($data['plugins']) : 0;
-        $this->jsonSuccess(array('count' => $count, 'updated' => $data['updated'] ?? ''), "已拉取 {$count} 个插件");
+
+        // 自动刷新（非 force）：stale-while-revalidate
+        $alreadyLocked = (file_exists($lockFile) && (time() - (int)@filemtime($lockFile)) < 120);
+        $count = 0;
+        if (file_exists($cacheFile)) {
+            $cacheData = @json_decode(file_get_contents($cacheFile), true);
+            $count = isset($cacheData['plugins']) ? count($cacheData['plugins']) : 0;
+        }
+
+        // 立即将当前缓存数量返回给前端，释放连接
+        $this->_sendJsonAndContinue(array(
+            'code'    => 0,
+            'message' => '后台刷新中…',
+            'data'    => array('count' => $count, 'cache_stale' => true),
+        ));
+
+        // 连接已关闭，后台继续刷新（不阻塞前端）
+        if (!$alreadyLocked) {
+            if (!is_dir($cacheDir)) @mkdir($cacheDir, 0755, true);
+            @file_put_contents($lockFile, (string)time());
+            @ignore_user_abort(true);
+            @set_time_limit(90);
+
+            $data = AdminBeautifyStore_Plugin::fetchRemoteRegistry();
+            if ($data) {
+                $data['_cached_at'] = time();
+                @file_put_contents($cacheFile, json_encode($data, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
+            }
+            @unlink($lockFile);
+        }
+        exit;
     }
 
     /**
-     * 检测更新（供 footer JS 调用，返回有更新的插件列表）
-     * 使用缓存，不重新拉取
+     * 检测更新（供 footer JS / update-check.js 调用）
+     *
+     * 始终立即返回缓存中的更新列表（非阻塞），
+     * 若缓存已过期且无正在进行的后台刷新，则在连接关闭后异步续期缓存。
      */
     private function handleCheckUpdates()
     {
         $this->checkAuth();
 
-        $registry = AdminBeautifyStore_Plugin::loadCachedRegistry();
-        $plugins  = isset($registry['plugins']) ? $registry['plugins'] : array();
+        $cacheFile = AdminBeautifyStore_Plugin::cacheFile();
+        $lockFile  = dirname($cacheFile) . DIRECTORY_SEPARATOR . '.refresh_lock';
+        $cacheDir  = dirname($cacheFile);
+        $cacheTTL  = defined('AdminBeautifyStore_Plugin::CACHE_TTL')
+            ? AdminBeautifyStore_Plugin::CACHE_TTL
+            : 3600;
+
+        // 判断缓存是否过期
+        $cachedAt    = 0;
+        $cacheExists = file_exists($cacheFile);
+        if ($cacheExists) {
+            $tmp     = @json_decode(@file_get_contents($cacheFile), true);
+            $cachedAt = isset($tmp['_cached_at']) ? (int)$tmp['_cached_at'] : 0;
+        }
+        $isStale       = ($cachedAt === 0 || (time() - $cachedAt) >= $cacheTTL);
+        $alreadyLocked = (file_exists($lockFile) && (time() - (int)@filemtime($lockFile)) < 120);
+        $needsBgRefresh = $isStale && !$alreadyLocked;
+
+        // 读取缓存并计算有更新的插件
+        $registry     = AdminBeautifyStore_Plugin::loadCachedRegistry();
+        $plugins      = isset($registry['plugins']) ? $registry['plugins'] : array();
         $installedMap = AdminBeautifyStore_Plugin::buildInstalledVersionMap();
 
         $updates = array();
         foreach ($plugins as $p) {
-            $dir      = isset($p['directory']) ? $p['directory'] : '';
-            $remoteVer = isset($p['version'])  ? $p['version']   : '';
+            $dir       = isset($p['directory']) ? $p['directory'] : '';
+            $remoteVer = isset($p['version'])   ? $p['version']   : '';
             if (!$dir || !isset($installedMap[$dir])) continue;
             $localVer = $installedMap[$dir];
             if ($remoteVer && $localVer && version_compare($remoteVer, $localVer, '>')) {
                 $updates[] = array(
-                    'id'         => $p['id']   ?? $dir,
-                    'name'       => $p['name'] ?? $dir,
-                    'localVer'   => $localVer,
-                    'remoteVer'  => $remoteVer,
+                    'id'        => isset($p['id'])   ? $p['id']   : $dir,
+                    'name'      => isset($p['name']) ? $p['name'] : $dir,
+                    'localVer'  => $localVer,
+                    'remoteVer' => $remoteVer,
                 );
             }
         }
 
-        $this->jsonSuccess(array(
-            'updates'    => $updates,
-            'hasUpdates' => count($updates) > 0,
-            'count'      => count($updates),
-        ), count($updates) > 0 ? '发现 ' . count($updates) . ' 个插件有更新' : '已是最新版本');
+        // 立即将结果返回给浏览器，同时释放连接（stale-while-revalidate）
+        $this->_sendJsonAndContinue(array(
+            'code'    => 0,
+            'message' => count($updates) > 0
+                ? '发现 ' . count($updates) . ' 个插件有更新'
+                : '已是最新版本',
+            'data' => array(
+                'updates'     => $updates,
+                'hasUpdates'  => count($updates) > 0,
+                'count'       => count($updates),
+                'cache_stale' => $isStale,
+            ),
+        ));
+
+        // 连接已关闭，后台续期缓存（不影响前端）
+        if ($needsBgRefresh) {
+            if (!is_dir($cacheDir)) @mkdir($cacheDir, 0755, true);
+            @file_put_contents($lockFile, (string)time());
+            @ignore_user_abort(true);
+            @set_time_limit(90);
+
+            $data = AdminBeautifyStore_Plugin::fetchRemoteRegistry();
+            if ($data) {
+                $data['_cached_at'] = time();
+                @file_put_contents($cacheFile, json_encode($data, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
+            }
+            @unlink($lockFile);
+        }
+        exit;
     }
 
     /**
@@ -507,12 +599,12 @@ class AdminBeautifyStore_Action extends Typecho_Widget implements Widget_Interfa
             return 'PHP ZipArchive 扩展未安装，无法解压 ZIP';
         }
 
-        // 下载 ZIP 到临时文件
+        // 下载 ZIP 到临时文件（github.com / codeload.github.com 走镜像兜底）
         $tmpFile = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'abs_' . md5($zipUrl . time()) . '.zip';
 
         $ctx = stream_context_create(array(
             'http' => array(
-                'timeout'         => 60,
+                'timeout'         => 90,
                 'follow_location' => 1,
                 'max_redirects'   => 5,
                 'user_agent'      => 'AB-Store/1.0 (+https://github.com/lhl77/Typecho-Plugin-AdminBeautifyStore)',
@@ -524,8 +616,21 @@ class AdminBeautifyStore_Action extends Typecho_Widget implements Widget_Interfa
             ),
         ));
 
-        $zipContent = @file_get_contents($zipUrl, false, $ctx);
-        if ($zipContent === false || strlen($zipContent) < 100) {
+        // 对 github.com / codeload.github.com 的 ZIP 依次尝试镜像
+        $isGithubUrl = (strpos($zipUrl, 'github.com') !== false);
+        $mirrors = $isGithubUrl
+            ? array('', 'https://gh-proxy.top/', 'https://ghfast.top/', 'https://ghproxy.com/')
+            : array('');
+        $zipContent = false;
+        foreach ($mirrors as $prefix) {
+            $tryUrl = $prefix . $zipUrl;
+            $zipContent = @file_get_contents($tryUrl, false, $ctx);
+            if ($zipContent !== false && strlen($zipContent) >= 100) {
+                break;
+            }
+            $zipContent = false;
+        }
+        if ($zipContent === false) {
             return "下载失败：{$zipUrl}";
         }
 
@@ -676,6 +781,35 @@ class AdminBeautifyStore_Action extends Typecho_Widget implements Widget_Interfa
     // ================================================================
     //  Auth / JSON 响应工具
     // ================================================================
+
+    /**
+     * 立即将 JSON 响应发送给浏览器（释放 Session 锁 + 关闭连接），
+     * 函数返回后可继续执行后台逻辑（stale-while-revalidate 模式）。
+     */
+    private function _sendJsonAndContinue(array $payload)
+    {
+        $body = json_encode($payload, JSON_UNESCAPED_UNICODE);
+        // 清空所有输出缓冲
+        while (ob_get_level() > 0) {
+            @ob_end_clean();
+        }
+        // 释放 Session 文件锁，防止阻塞同一用户的其他并发请求
+        if (session_status() === PHP_SESSION_ACTIVE) {
+            @session_write_close();
+        }
+        if (!headers_sent()) {
+            header('Content-Type: application/json; charset=utf-8');
+            header('Connection: close');
+            header('Content-Length: ' . strlen($body));
+        }
+        echo $body;
+        @ob_start();
+        @ob_end_flush();
+        @flush();
+        if (function_exists('fastcgi_finish_request')) {
+            @fastcgi_finish_request();
+        }
+    }
 
     private function checkAuth()
     {
