@@ -5,7 +5,7 @@
  *
  * @package   AB-Store
  * @author    LHL
- * @version   1.0.16
+ * @version   1.0.17
  * @link      https://github.com/lhl77/Typecho-Plugin-AdminBeautifyStore
  */
 
@@ -94,10 +94,8 @@ class AdminBeautifyStore_Plugin implements Typecho_Plugin_Interface
         $form->addInput($cdnMode);
 
         // 提示用户通过侧边栏访问
-        $panelUrl = Typecho_Common::url(
-            '/admin/extending.php?panel=' . urlencode('AdminBeautifyStore/Panel.php'),
-            Typecho_Widget::widget('Widget_Options')->index
-        );
+        $panelUrl = Typecho_Widget::widget('Widget_Options')->adminUrl
+            . 'extending.php?panel=' . urlencode('AdminBeautifyStore/Panel.php');
         echo '<p style="margin:8px 0 0;color:var(--md-on-surface-variant,#49454f)">'
             . 'AB-Store 商店界面已添加到控制台侧边栏。'
             . ' <a href="' . htmlspecialchars($panelUrl) . '">点此前往 AB-Store →</a>'
@@ -146,7 +144,7 @@ class AdminBeautifyStore_Plugin implements Typecho_Plugin_Interface
             'pluginUrl'     => Typecho_Common::url('AdminBeautifyStore/', $options->pluginUrl),
             'installedMap'  => $installedMap,
             'activatedMap'  => self::buildActivatedMap(),
-            'storeUrl'      => Typecho_Common::url('/admin/extending.php?panel=' . urlencode('AdminBeautifyStore/Panel.php'), $options->index),
+            'storeUrl'      => $options->adminUrl . 'extending.php?panel=' . urlencode('AdminBeautifyStore/Panel.php'),
             'cachedAt'      => $cachedAt,
         ), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . ';';
         // 所有后台页面：缓存超过 10 分钟时静默刷新；Store 页额外触发页面重载以更新展示
@@ -181,7 +179,7 @@ JS;
         $ajaxUrl  = Typecho_Common::url('/action/abs', $options->index);
         $token    = $security->getToken($ajaxUrl);
         $assetBase = Typecho_Common::url('AdminBeautifyStore/assets/', $options->pluginUrl);
-        $pluginsUrl = Typecho_Common::url('/admin/plugins.php', $options->index);
+        $pluginsUrl = $options->adminUrl . 'plugins.php';
 
         // 读取缓存的 JSON
         $registry = self::loadCachedRegistry();
@@ -330,7 +328,7 @@ JS;
                 }
             }
             $settingsUrl  = $hasConfig
-                ? Typecho_Common::url('/admin/options-plugin.php?config=' . urlencode($pdir), $options->index)
+                ? $options->adminUrl . 'options-plugin.php?config=' . urlencode($pdir)
                 : '';
             $cardClass = 'abs-card';
             if ($isInstalled && $isActivated) $cardClass .= ' abs-card-active';
