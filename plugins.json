@@ -1,6 +1,6 @@
 {
   "schema": "1.0",
-  "updated": "2026-03-23T04:36:50Z",
+  "updated": "2026-03-23T05:28:10Z",
   "plugins": [
     {
       "id": "AB-Store",
@@ -200,7 +200,7 @@
       "description": "多存储后端图片上传&处理插件，支持多种远程存储服务，支持上传前图片处理，多 Profile 通过 JSON 存储，可随时切换。 ",
       "author": "LHL",
       "authorUrl": "https://blog.lhl.one",
-      "version": "1.0.1",
+      "version": "1.1.0",
       "repo": "lhl77/Typecho-Plugin-PicUp",
       "directory": "PicUp",
       "subDirectory": "PicUp",
@@ -235,9 +235,9 @@
       "version": "1.3.5",
       "repo": "ChrisonLeon/BlogHelper_for_Typecho",
       "directory": "BlogHelper",
-      "subDirectory": "",
+      "subDirectory": "BlogHelper_for_Typecho-1.3.5-2",
       "branch": "main",
-      "downloadUrl": "",
+      "downloadUrl": "https://github.com/ChrisonLeon/BlogHelper_for_Typecho/archive/refs/tags/1.3.5-2.zip",
       "homepage": "https://chrison.cn/work/369.html",
       "tags": ["微信小程序","微信运动"],
       "changelog": "https://github.com/ChrisonLeon/BlogHelper_for_Typecho/releases"
