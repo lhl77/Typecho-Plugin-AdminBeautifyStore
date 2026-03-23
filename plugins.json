@@ -1,6 +1,6 @@
 {
   "schema": "1.0",
-  "updated": "2026-03-22T14:41:51Z",
+  "updated": "2026-03-23T00:40:39Z",
   "plugins": [
     {
       "id": "AB-Store",
@@ -209,6 +209,22 @@
       "homepage": "https://blog.lhl.one/artical/1026.html",
       "tags": ["图床","图片处理"],
       "changelog": "https://github.com/lhl77/Typecho-Plugin-PicUp/releases"
+    },
+    {
+      "id": "gatelogin",
+      "name": "GateLogin",
+      "description": "6款精美登录模板，让您的登录页面更具个性  ",
+      "author": "优优",
+      "authorUrl": "https://github.com/Moze54",
+      "version": "1.0.0",
+      "repo": "Moze54/GateLogin",
+      "directory": "GateLogin",
+      "subDirectory": "GateLogin",
+      "branch": "master",
+      "downloadUrl": "https://github.com/Moze54/GateLogin/releases/download/v1.0.0/GateLogin.zip",
+      "homepage": "https://blog.uuhb.cn/archives/GateLogin-Typecho.html",
+      "tags": ["美化","登录页美化"],
+      "changelog": "https://github.com/Moze54/GateLogin/releases"
     }
   ]
 }
