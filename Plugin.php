@@ -174,7 +174,7 @@ JS;
         echo '</script>';
 
         $assetBase = Typecho_Common::url('AdminBeautifyStore/assets/', $options->pluginUrl);
-        echo '<script src="' . $assetBase . 'update-check.js"></script>' . "\n";
+        echo '<script src="' . $assetBase . 'update-check.v1.0.18.js"></script>' . "\n";
     }
 
     // ================================================================
