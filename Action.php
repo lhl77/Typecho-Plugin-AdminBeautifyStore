@@ -616,10 +616,10 @@ class AdminBeautifyStore_Action extends Typecho_Widget implements Widget_Interfa
             ),
         ));
 
-        // 对 github.com / codeload.github.com 的 ZIP 依次尝试镜像
+        // 对 github.com / codeload.github.com 的 ZIP 统一走 gh1.lhl.one 镜像
         $isGithubUrl = (strpos($zipUrl, 'github.com') !== false);
         $mirrors = $isGithubUrl
-            ? array('', 'https://gh-proxy.top/', 'https://ghfast.top/', 'https://ghproxy.com/')
+            ? array('https://gh1.lhl.one/')
             : array('');
         $zipContent = false;
         foreach ($mirrors as $prefix) {

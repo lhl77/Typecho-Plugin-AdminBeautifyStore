@@ -5,7 +5,7 @@
  *
  * @package   AB-Store
  * @author    LHL
- * @version   1.0.17
+ * @version   1.0.18
  * @link      https://github.com/lhl77/Typecho-Plugin-AdminBeautifyStore
  */
 
@@ -55,7 +55,7 @@ class AdminBeautifyStore_Plugin implements Typecho_Plugin_Interface
         Typecho_Plugin::factory('admin/footer.php')->begin = array(__CLASS__, 'injectFooter');
 
         // 初始化插件配置，避免访问"设置"页时抛出"配置信息没有找到"
-        Utils\Helper::configPlugin('AdminBeautifyStore', array('_v' => '1', 'cdnMode' => 'github'));
+        Utils\Helper::configPlugin('AdminBeautifyStore', array('_v' => '1', 'notifyOptOut' => '0'));
 
         // 确保 backup 目录存在
         if (!is_dir(self::backupDir())) {
@@ -80,18 +80,12 @@ class AdminBeautifyStore_Plugin implements Typecho_Plugin_Interface
         $hidden = new Typecho_Widget_Helper_Form_Element_Hidden('_v', null, '1');
         $form->addInput($hidden);
 
-        // CDN 模式设置
-        $cdnMode = new Typecho_Widget_Helper_Form_Element_Radio(
-            'cdnMode',
-            array(
-                'github'    => '直接连接 GitHub（默认）',
-                'jsdelivr'  => '通过 jsDelivr CDN（访问 raw.githubusercontent.com 受限时推荐）',
-            ),
-            'github',
-            '插件列表获取方式',
-            '仅影响「刷新列表」时的 plugins.json 拉取地址；插件安装/升级仍通过 GitHub 直接下载 ZIP。'
-        );
-        $form->addInput($cdnMode);
+        // 兼容旧版 DB 字段（已从 UI 移除，但 DB 里可能仍存；
+        // 必须在此注册，否则 Typecho Config.php 迭代 DB 选项时
+        // 调用 $form->getInput($key)->value($val) 会因 getInput 返回 null 而崩溃）
+        $legacyCdnMode = new Typecho_Widget_Helper_Form_Element_Hidden('cdnMode', null, '');
+        $form->addInput($legacyCdnMode);
+
 
         // 提示用户通过侧边栏访问
         $panelUrl = Typecho_Widget::widget('Widget_Options')->adminUrl
@@ -100,6 +94,20 @@ class AdminBeautifyStore_Plugin implements Typecho_Plugin_Interface
             . 'AB-Store 商店界面已添加到控制台侧边栏。'
             . ' <a href="' . htmlspecialchars($panelUrl) . '">点此前往 AB-Store →</a>'
             . '</p>';
+        
+
+        // 更新通知开关
+        $notifyOptOut = new Typecho_Widget_Helper_Form_Element_Radio(
+            'notifyOptOut',
+            array(
+                '0' => _t('显示通知（默认）'),
+                '1' => _t('关闭通知'),
+            ),
+            '0',
+            _t('插件更新通知'),
+            _t('关闭后，将不再在后台页面顶部显示插件有可用更新的横幅通知。')
+        );
+        $form->addInput($notifyOptOut);
     }
 
     /** 个人配置（空） */
@@ -126,6 +134,14 @@ class AdminBeautifyStore_Plugin implements Typecho_Plugin_Interface
         $ajaxUrl  = Typecho_Common::url('/action/abs', $options->index);
         $token    = $security->getToken($ajaxUrl);
 
+        // 读取通知开关
+        $pluginOpts   = null;
+        try {
+            $pluginOpts = $options->plugin('AdminBeautifyStore');
+        } catch (Exception $e) {}
+        $notifyOptOut = ($pluginOpts && isset($pluginOpts->notifyOptOut))
+            ? (string)$pluginOpts->notifyOptOut : '0';
+
         // 将已安装的仓库内插件版本信息传递给前端
         $installedMap = self::buildInstalledVersionMap();
 
@@ -146,6 +162,7 @@ class AdminBeautifyStore_Plugin implements Typecho_Plugin_Interface
             'activatedMap'  => self::buildActivatedMap(),
             'storeUrl'      => $options->adminUrl . 'extending.php?panel=' . urlencode('AdminBeautifyStore/Panel.php'),
             'cachedAt'      => $cachedAt,
+            'notifyOptOut'  => $notifyOptOut,
         ), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . ';';
         // 所有后台页面：缓存超过 10 分钟时静默刷新；Store 页额外触发页面重载以更新展示
         echo <<<'JS'
@@ -797,46 +814,12 @@ JS;
     }
 
     /**
-     * 根据 CDN 设置返回 plugins.json 的拉取地址
-     */
-    public static function getRegistryUrl()
-    {
-        try {
-            $opts = Typecho_Widget::widget('Widget_Options')->plugin('AdminBeautifyStore');
-            $mode = isset($opts->cdnMode) ? $opts->cdnMode : 'github';
-        } catch (Exception $e) {
-            $mode = 'github';
-        }
-        if ($mode === 'jsdelivr') {
-            return 'https://cdn.jsdelivr.net/gh/lhl77/Typecho-Plugin-AdminBeautifyStore@main/plugins.json';
-        }
-        return self::REMOTE_JSON_URL;
-    }
-
-    /**
-     * 从远端拉取最新 JSON（支持 GitHub 镜像兜底，每节点 8s 超时）
+     * 从远端拉取最新 JSON（统一走 gh1.lhl.one 镜像）
      */
     public static function fetchRemoteRegistry()
     {
-        $baseUrl = self::getRegistryUrl();
-
-        // jsDelivr CDN 无需镜像，直接请求（timeout 适当放宽到 16s）
-        if (strpos($baseUrl, 'jsdelivr.net') !== false) {
-            return self::_httpGetJson($baseUrl, 16);
-        }
-
-        // raw.githubusercontent.com → 依次尝试直连 + 镜像代理
-        $mirrors = array(
-            '',                       // 直连（优先）
-            'https://gh-proxy.top/',
-            'https://ghfast.top/',
-            'https://ghproxy.com/',
-        );
-        foreach ($mirrors as $prefix) {
-            $data = self::_httpGetJson($prefix . $baseUrl, 8);
-            if ($data !== null) return $data;
-        }
-        return null;
+        $baseUrl = self::REMOTE_JSON_URL;
+        return self::_httpGetJson('https://gh1.lhl.one/' . $baseUrl, 16);
     }
 
     /**
