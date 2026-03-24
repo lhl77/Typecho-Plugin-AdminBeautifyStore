@@ -1,6 +1,6 @@
 {
   "schema": "1.0",
-  "updated": "2026-03-24T01:10:11Z",
+  "updated": "2026-03-24T12:49:21Z",
   "plugins": [
     {
       "id": "AB-Store",
@@ -8,7 +8,7 @@
       "description": "Typecho 插件管理，与AdminBeautify配套使用",
       "author": "LHL",
       "authorUrl": "https://blog.lhl.one",
-      "version": "1.0.17",
+      "version": "1.0.18",
       "repo": "lhl77/Typecho-Plugin-AdminBeautifyStore",
       "directory": "AdminBeautifyStore",
       "subDirectory": "",
@@ -139,9 +139,9 @@
       "version": "1.2.0",
       "repo": "3554171776/Smart-Gallery",
       "directory": "SmartGallery",
-      "subDirectory": "",
+      "subDirectory": "Smart-Gallery",
       "branch": "main",
-      "downloadUrl": "",
+      "downloadUrl": "https://github.com/lhl77/Typecho-Plugin-AdminBeautifyStore/releases/download/%E6%8F%92%E4%BB%B6%E4%BB%93%E5%BA%93ZIP%E5%8C%85/Smart-Gallery_v1.2.0.zip",
       "homepage": "https://github.com/3554171776/Smart-Gallery",
       "tags": ["内容","相册","短代码"],
       "changelog": "https://github.com/3554171776/Smart-Gallery/releases"
@@ -155,9 +155,9 @@
       "version": "1.0",
       "repo": "jian27com/ueditor-plus-typecho",
       "directory": "UEditor",
-      "subDirectory": "",
+      "subDirectory": "ueditor-plus-typecho",
       "branch": "main",
-      "downloadUrl": "",
+      "downloadUrl": "https://github.com/lhl77/Typecho-Plugin-AdminBeautifyStore/releases/download/%E6%8F%92%E4%BB%B6%E4%BB%93%E5%BA%93ZIP%E5%8C%85/ueditor-plus-typecho_v1.0.0.zip",
       "homepage": "https://www.myhelen.cn/helen/112.htm",
       "tags": ["编辑器"],
       "changelog": "https://github.com/jian27com/ueditor-plus-typecho"
