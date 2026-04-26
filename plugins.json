@@ -1,6 +1,6 @@
 {
   "schema": "1.0",
-  "updated": "2026-04-11T13:11:21Z",
+  "updated": "2026-04-26T09:08:21Z",
   "plugins": [
     {
       "id": "AB-Store",
@@ -241,6 +241,22 @@
       "homepage": "https://chrison.cn/work/369.html",
       "tags": ["微信小程序","微信运动"],
       "changelog": "https://github.com/ChrisonLeon/BlogHelper_for_Typecho/releases"
+    },
+    {
+      "id": "TinyMCE-8-for-Typecho",
+      "name": "TinyMCE 8 for Typecho",
+      "description": "一款专为 Typecho 1.3.0 深度定制的 TinyMCE 8.4.0 富文本编辑器插件。它完美替换了原生的 Markdown 编辑器，并深度集成了 Typecho 的附件管理系统，提供专业、顺滑的写作体验。 ",
+      "author": "JamesLi",
+      "authorUrl": "https://jamesjie.com",
+      "version": "1.0.0",
+      "repo": "JamesLi518/TinyMCE-8-for-Typecho",
+      "directory": "TinyMCE8",
+      "subDirectory": "TinyMCE-8-for-Typecho-1.0.0",
+      "branch": "main",
+      "downloadUrl": "https://github.com/JamesLi518/TinyMCE-8-for-Typecho/archive/refs/tags/v1.0.0.zip",
+      "homepage": "https://jamesjie.com/Share/Typecho-1-3-0-TinyMCE-8.html",
+      "tags": ["编辑器"],
+      "changelog": "https://github.com/JamesLi518/TinyMCE-8-for-Typecho/releases"
     }
   ]
 }
