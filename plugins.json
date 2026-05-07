@@ -257,6 +257,22 @@
       "homepage": "https://jamesjie.com/Share/Typecho-1-3-0-TinyMCE-8.html",
       "tags": ["编辑器"],
       "changelog": "https://github.com/JamesLi518/TinyMCE-8-for-Typecho/releases"
+    },
+    {
+      "id": "TypechoOAuthLogin",
+      "name": "TypechoOAuthLogin",
+      "description": "一款用于typecho的OIDC/OAuth2.0登录插件。目前支持腾讯QQ、自定义的OIDC/Oauth2.0、GitHub、MSN、微信、Google、新浪微博、豆瓣、点点、淘宝网、百度",
+      "author": "tianlingzi",
+      "authorUrl": "https://www.tianlingzi.top",
+      "version": "4.2",
+      "repo": "tianlingzi/TypechoOAuthLogin",
+      "directory": "TypechoOAuthLogin",
+      "subDirectory": "TypechoOAuthLogin",
+      "branch": "main",
+      "downloadUrl": "https://gitea.tianlingzi.top/tianlingzi/TypechoOAuthLogin/archive/4.2.zip",
+      "homepage": "https://www.tianlingzi.top/archives/232/",
+      "tags": ["登录"],
+      "changelog": "https://github.com/tianlingzi/TypechoOAuthLogin/releases"
     }
   ]
 }
