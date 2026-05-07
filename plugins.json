@@ -1,6 +1,6 @@
 {
   "schema": "1.0",
-  "updated": "2026-04-26T09:08:21Z",
+  "updated": "2026-05-07T16:55:21Z",
   "plugins": [
     {
       "id": "AB-Store",
@@ -17,6 +17,22 @@
       "homepage": "https://blog.lhl.one/artical/998.html",
       "tags": ["插件仓库"],
       "changelog": "https://github.com/lhl77/Typecho-Plugin-AdminBeautifyStore/releases"
+    },
+    {
+      "id": "AB-OAuth",
+      "name": "AB OAuth",
+      "description": "AdminBeautify 专用 OAuth 登录插件",
+      "author": "LHL",
+      "authorUrl": "https://blog.lhl.one",
+      "version": "1.0.0",
+      "repo": "lhl77/Typecho-Plugin-AdminBeautifyOAuth",
+      "directory": "AdminBeautifyOAuth",
+      "subDirectory": "AdminBeautifyOAuth",
+      "branch": "main",
+      "downloadUrl": "https://github.com/lhl77/Typecho-Plugin-AdminBeautifyOAuth/releases/download/v1.0.0/AdminBeautifyOAuth.zip",
+      "homepage": "https://blog.lhl.one/artical/1199.html",
+      "tags": ["OAuth"],
+      "changelog": "https://github.com/lhl77/Typecho-Plugin-AdminBeautifyOAuth/releases"
     },
     {
       "id": "LinksPlus",
