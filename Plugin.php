@@ -5,7 +5,7 @@
  *
  * @package   AB-Store
  * @author    LHL
- * @version   1.0.18
+ * @version   1.0.19
  * @link      https://github.com/lhl77/Typecho-Plugin-AdminBeautifyStore
  */
 
@@ -158,6 +158,7 @@ class AdminBeautifyStore_Plugin implements Typecho_Plugin_Interface
             'ajaxUrl'       => $ajaxUrl,
             'token'         => $token,
             'pluginUrl'     => Typecho_Common::url('AdminBeautifyStore/', $options->pluginUrl),
+            'downloadApiBase' => 'https://gh1.lhl.one',
             'installedMap'  => $installedMap,
             'activatedMap'  => self::buildActivatedMap(),
             'storeUrl'      => $options->adminUrl . 'extending.php?panel=' . urlencode('AdminBeautifyStore/Panel.php'),
@@ -319,6 +320,20 @@ JS;
             $phome    = isset($p['homepage'])     ? $p['homepage']    : '';
             $ptags    = isset($p['tags'])         ? (array)$p['tags'] : array();
             $pbranch  = isset($p['branch'])       ? $p['branch']      : 'main';
+            $downloadKey = $pid ? $pid : $pdir;
+
+            $displayTags = array();
+            $isFeatured  = false;
+            foreach ($ptags as $tag) {
+                $tag = trim((string)$tag);
+                if ($tag === '') continue;
+                if (mb_strpos($tag, '推荐', 0, 'UTF-8') !== false || $tag === '强调') {
+                    $isFeatured = true;
+                }
+                // "强调" / "推荐" 只做控制，不在前台标签区展示
+                if ($tag === '强调' || mb_strpos($tag, '推荐', 0, 'UTF-8') !== false) continue;
+                $displayTags[] = $tag;
+            }
 
             $isInstalled  = $pdir && in_array($pdir, $installedDirs);
             $isActivated  = $isInstalled && isset($activatedMap[$pdir]);
@@ -351,15 +366,17 @@ JS;
             if ($isInstalled && $isActivated) $cardClass .= ' abs-card-active';
             if ($isInstalled && !$isActivated) $cardClass .= ' abs-card-disabled';
             if ($hasUpdate)   $cardClass .= ' abs-card-update';
+            if ($isFeatured)  $cardClass .= ' abs-card-featured';
         ?>
         <div class="<?php echo $cardClass; ?>"
              data-index="<?php echo $pIdx; ?>"
              data-id="<?php echo htmlspecialchars($pid); ?>"
              data-dir="<?php echo htmlspecialchars($pdir); ?>"
+             data-download-key="<?php echo htmlspecialchars($downloadKey); ?>"
              data-installed="<?php echo $isInstalled ? '1' : '0'; ?>"
              data-activated="<?php echo $isActivated ? '1' : '0'; ?>"
              data-has-update="<?php echo $hasUpdate ? '1' : '0'; ?>"
-             data-filter-tags="<?php echo htmlspecialchars(implode(' ', $ptags)); ?>">
+             data-filter-tags="<?php echo htmlspecialchars(implode(' ', $displayTags)); ?>">
 
             <div class="abs-card-header">
                 <div class="abs-card-avatar<?php echo $isInstalled && !$isActivated ? ' abs-avatar-disabled' : ''; ?>">
@@ -368,12 +385,24 @@ JS;
                 <div class="abs-card-meta">
                     <div class="abs-card-name"><?php echo htmlspecialchars($pname); ?></div>
                     <div class="abs-card-author">
-                        <?php if ($pauthorU): ?>
-                        <a href="<?php echo htmlspecialchars($pauthorU); ?>" target="_blank" rel="noopener"><?php echo htmlspecialchars($pauthor); ?></a>
-                        <?php else: echo htmlspecialchars($pauthor); endif; ?>
+                        <div style="display:flex;align-items:center;gap:6px;width:100%">
+                            <span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:70%">
+                                <?php if ($pauthorU): ?>
+                                <a href="<?php echo htmlspecialchars($pauthorU); ?>" target="_blank" rel="noopener"><?php echo htmlspecialchars($pauthor); ?></a>
+                                <?php else: echo htmlspecialchars($pauthor); endif; ?>
+                            </span>
+                            <span style="opacity:0.4;font-size:0.75rem;flex-shrink:0">•</span>
+                            <span class="abs-download" data-download-key="<?php echo htmlspecialchars($downloadKey); ?>" data-count="" title="安装次数" style="flex-shrink:0">
+                                <span class="abs-icon" style="font-size:0.95rem">download</span>
+                                <span class="abs-download-text"><span class="abs-download-skeleton" style="width:24px;height:10px;vertical-align:middle;display:inline-block"></span></span>
+                            </span>
+                        </div>
                     </div>
                 </div>
                 <div class="abs-card-badge-wrap">
+                    <?php if ($isFeatured): ?>
+                    <span class="abs-badge abs-badge-featured"><span class="abs-icon" style="font-size:.75rem">auto_awesome</span>推荐</span>
+                    <?php endif; ?>
                     <?php if ($hasUpdate): ?>
                     <span class="abs-badge abs-badge-update">新版本 <?php echo htmlspecialchars($pver); ?></span>
                     <?php elseif ($isActivated): ?>
@@ -386,9 +415,9 @@ JS;
 
             <div class="abs-card-desc"><?php echo htmlspecialchars($pdesc); ?></div>
 
-            <?php if (!empty($ptags)): ?>
+            <?php if (!empty($displayTags)): ?>
             <div class="abs-card-tags">
-                <?php foreach ($ptags as $tag): ?>
+                <?php foreach ($displayTags as $tag): ?>
                 <span class="abs-tag"><?php echo htmlspecialchars($tag); ?></span>
                 <?php endforeach; ?>
             </div>
@@ -497,6 +526,7 @@ JS;
                             data-action="install"
                             data-id="<?php echo htmlspecialchars($pid); ?>"
                             data-dir="<?php echo htmlspecialchars($pdir); ?>"
+                            data-dlkey="<?php echo htmlspecialchars($downloadKey); ?>"
                             data-repo="<?php echo htmlspecialchars($prepo); ?>"
                             data-branch="<?php echo htmlspecialchars($pbranch); ?>"
                             data-subdir="<?php echo htmlspecialchars($psubDir); ?>"
@@ -538,6 +568,7 @@ JS;
     var CFG = window.__ABS_CFG__ || {};
     var ajaxUrl = document.getElementById('abs-root').dataset.ajax;
     var token   = document.getElementById('abs-root').dataset.token;
+    var downloadApiBase = String(CFG.downloadApiBase || 'https://gh1.lhl.one').replace(/\/+$/, '');
 
     // ── 将 overlay 移到 body，避免祖先 transform 破坏 position:fixed 定位 ──
     ['abs-progress', 'abs-uninstall-dialog'].forEach(function(id){
@@ -589,6 +620,72 @@ JS;
         }, 3500);
     }
 
+    function setDownloadLoading(el){
+        if(!el) return;
+        var text = el.querySelector('.abs-download-text');
+        if(text) text.innerHTML = '<span class="abs-download-skeleton"></span>';
+    }
+
+    function setDownloadText(el, count){
+        if(!el) return;
+        var text = el.querySelector('.abs-download-text');
+        if(!text) return;
+        var num = Number(count);
+        if(isFinite(num) && num >= 0){
+            el.dataset.count = String(num);
+            text.textContent = num;
+            return;
+        }
+        el.dataset.count = '';
+        text.textContent = '--';
+    }
+
+    function bumpDownloadCount(key){
+        if(!key) return;
+        document.querySelectorAll('.abs-download[data-download-key]').forEach(function(el){
+            if((el.dataset.downloadKey || '') !== key) return;
+            var current = parseInt(el.dataset.count || '', 10);
+            if(isFinite(current)) setDownloadText(el, current + 1);
+        });
+    }
+
+    function loadDownloadCounts(){
+        var nodes = Array.prototype.slice.call(document.querySelectorAll('.abs-download[data-download-key]'));
+        if(!nodes.length) return;
+        var keyMap = {};
+        nodes.forEach(function(node){
+            var key = (node.dataset.downloadKey || '').trim();
+            if(!key) return;
+            keyMap[key] = true;
+            setDownloadLoading(node);
+        });
+        var keys = Object.keys(keyMap);
+        if(!keys.length) return;
+
+        var url = downloadApiBase + '/api/downloads?ids=' + encodeURIComponent(keys.join(','));
+        fetch(url, {method:'GET'})
+            .then(function(r){ return r.json(); })
+            .then(function(res){
+                var map = (res && res.data) ? res.data : {};
+                nodes.forEach(function(node){
+                    var key = (node.dataset.downloadKey || '').trim();
+                    setDownloadText(node, map[key]);
+                });
+            })
+            .catch(function(){
+                nodes.forEach(function(node){ setDownloadText(node, null); });
+            });
+    }
+
+    function recordDownloadCount(key, meta){
+        if(!key) return;
+        fetch(downloadApiBase + '/api/downloads/record', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({key: key, delta: 1, meta: meta || {}})
+        }).catch(function(){});
+    }
+
     // ── 刷新列表 ──
     document.getElementById('abs-refresh-btn').addEventListener('click', function(){
         showProgress('正在从 GitHub 拉取最新插件列表…');
@@ -630,6 +727,8 @@ JS;
         try { localStorage.setItem('abs-sort', v); } catch(e) {}
         sortCards(v);
     });
+
+    loadDownloadCounts();
 
     // ── 搜索 ──
     var searchEl = document.getElementById('abs-search');
@@ -679,6 +778,7 @@ JS;
         var subdir  = btn.dataset.subdir  || '';
         var downloadUrl = btn.dataset.downloadurl || '';
         var cardEl  = btn.closest('.abs-card');
+        var downloadKey = btn.dataset.dlkey || (cardEl ? (cardEl.dataset.downloadKey || '') : '');
         var name    = cardEl && cardEl.querySelector('.abs-card-name')
                       ? cardEl.querySelector('.abs-card-name').textContent
                       : (dir || id || '');
@@ -688,6 +788,8 @@ JS;
             absPost('install', {id:id, dir:dir, repo:repo, branch:branch, subdir:subdir, downloadUrl:downloadUrl}, function(res){
                 hideProgress();
                 if(res.code === 0){
+                    bumpDownloadCount(downloadKey);
+                    recordDownloadCount(downloadKey, {id:id, dir:dir, name:name, repo:repo});
                     absToast('安装成功：' + name, 'success');
                     setTimeout(function(){ absNavigate(location.href); }, 800);
                 } else {
@@ -927,6 +1029,7 @@ JS;
 .abs-badge{display:inline-flex;align-items:center;padding:2px 10px;border-radius:999px;font-size:.72rem;font-weight:600;line-height:1.6}
 .abs-badge-installed{background:var(--md-secondary-container,#e8def8);color:var(--md-on-secondary-container,#1d192b)}
 .abs-badge-update{background:var(--md-primary,#6750a4);color:var(--md-on-primary,#fff)}
+.abs-badge-featured{background:linear-gradient(135deg,#FFD54F,#FFB300);color:#4E342E;display:inline-flex;align-items:center;gap:3px;box-shadow:0 2px 4px rgba(255,179,0,0.2)}
 .abs-badge-active{background:var(--md-tertiary-container,#c4eed0);color:var(--md-on-tertiary-container,#002114);display:inline-flex;align-items:center;gap:3px}
 .abs-badge-disabled{background:var(--md-surface-container,#ece6f0);color:var(--md-on-surface-variant,#49454f)}
 .abs-filter-bar{display:flex;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:20px}
@@ -946,6 +1049,8 @@ JS;
 .abs-card:hover{box-shadow:0 3px 12px color-mix(in srgb,var(--md-primary,#6750a4) 14%,transparent);transform:translateY(-1px);border-color:color-mix(in srgb,var(--md-outline-variant,#cac4d0) 70%,var(--md-primary,#6750a4))}
 .abs-card-installed{border-color:var(--md-secondary-container,#e8def8);background:color-mix(in srgb,var(--md-secondary-container,#e8def8) 30%,var(--md-surface-container-low,#f7f2fa))}
 .abs-card-update{border-color:var(--md-primary,#6750a4);background:color-mix(in srgb,var(--md-primary-container,#eaddff) 40%,var(--md-surface-container-low,#f7f2fa))}
+.abs-card-featured{border-color:color-mix(in srgb,#FFB300 40%,var(--md-outline-variant,#cac4d0));background:linear-gradient(135deg,color-mix(in srgb,#FFF8E1 80%,var(--md-surface-container-low,#f7f2fa)) 0%,var(--md-surface-container-low,#f7f2fa) 100%);box-shadow:0 3px 12px color-mix(in srgb,#FFB300 12%,transparent)}
+.abs-card-featured::before{content:'';position:absolute;left:0;top:0;width:100%;height:3px;background:linear-gradient(90deg,#FFD54F,#FFB300);opacity:.95}
 .abs-card-active{border-color:color-mix(in srgb,var(--md-tertiary-container,#c4eed0) 80%,var(--md-tertiary,#006e42));background:color-mix(in srgb,var(--md-tertiary-container,#c4eed0) 28%,var(--md-surface-container-low,#f7f2fa))}
 .abs-card-disabled{border-color:var(--md-outline-variant,#cac4d0);background:var(--md-surface-container-lowest,#fffbfe);opacity:.75}
 .abs-avatar-disabled{background:var(--md-surface-container-highest,#e6e0e9)!important;color:var(--md-on-surface-variant,#49454f)!important}
@@ -964,6 +1069,11 @@ JS;
 .abs-card-ver{display:flex;align-items:center;gap:4px;font-size:.76rem;color:var(--md-on-surface-variant,#49454f);flex-shrink:0;min-width:0;max-width:50%}
 .abs-card-ver span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .abs-ver-new{color:var(--md-primary,#6750a4);font-weight:600}
+.abs-download{display:inline-flex;align-items:center;gap:3px;color:var(--md-on-surface-variant,#49454f);font-size:.78rem;line-height:1.5;min-width:32px;opacity:.85;cursor:default}
+.abs-download:hover{opacity:1;color:var(--md-primary,#6750a4)}
+.abs-download .abs-icon{font-size:.95rem}
+.abs-download-text{display:inline-flex;align-items:center;min-height:16px;font-weight:500;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;}
+.abs-download-skeleton{display:inline-block;width:52px;height:11px;border-radius:999px;background:linear-gradient(90deg,color-mix(in srgb,var(--md-surface-container-highest,#e6e0e9) 86%,transparent) 25%,color-mix(in srgb,var(--md-primary-container,#eaddff) 56%,transparent) 50%,color-mix(in srgb,var(--md-surface-container-highest,#e6e0e9) 86%,transparent) 75%);background-size:200% 100%;animation:abs-md3-shimmer 1.35s ease-in-out infinite}
 .abs-card-repo{display:inline-flex;align-items:center;color:var(--md-on-surface-variant,#49454f);text-decoration:none;opacity:.6;transition:opacity .15s}
 .abs-card-repo:hover{opacity:1}
 .abs-card-actions{display:flex;gap:4px;flex-wrap:nowrap;align-items:center;flex-shrink:0}
@@ -992,6 +1102,7 @@ JS;
 .abs-progress-card p{margin:0;font-size:.95rem;color:var(--md-on-surface,#1c1b1f);text-align:center}
 .abs-spinner{width:44px;height:44px;border:4px solid var(--md-surface-container-highest,#e6e0e9);border-top-color:var(--md-primary,#6750a4);border-radius:50%;animation:abs-spin .7s linear infinite}
 @keyframes abs-spin{to{transform:rotate(360deg)}}
+@keyframes abs-md3-shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
 .abs-dialog-overlay{position:fixed;inset:0;z-index:10000;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity .25s;padding:16px;box-sizing:border-box}
 .abs-dialog-overlay.abs-dialog-open{opacity:1}
 .abs-dialog{background:var(--md-surface-container-low,#f7f2fa);border-radius:28px;padding:28px 32px;width:100%;max-width:420px;box-shadow:0 8px 40px rgba(0,0,0,.22);transform:scale(.92);transition:transform .25s;display:flex;flex-direction:column;gap:14px;box-sizing:border-box}
@@ -1018,6 +1129,10 @@ JS;
 .abs-dialog-footer .abs-btn{width:100%;justify-content:center}
 .abs-progress-card{padding:28px 24px;border-radius:24px}
 .abs-toast{bottom:16px;padding:10px 18px;font-size:.85rem}
+}
+@media (prefers-color-scheme: dark){
+.abs-card-featured{border-color:color-mix(in srgb,#FFB300 35%,var(--md-outline-variant,#49454f));background:linear-gradient(135deg,color-mix(in srgb,#FFB300 8%,var(--md-surface-container-low,#1f1b24)) 0%,var(--md-surface-container-low,#1f1b24) 100%);box-shadow:0 6px 20px color-mix(in srgb,#FFB300 12%,transparent)}
+.abs-card-featured::before{background:linear-gradient(90deg,#FFD54F,#FBC02D);opacity:1}
 }
         <?php
     }
