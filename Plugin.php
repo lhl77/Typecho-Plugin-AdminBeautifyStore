@@ -5,7 +5,7 @@
  *
  * @package   AB-Store
  * @author    LHL
- * @version   1.0.19
+ * @version   1.0.20
  * @link      https://github.com/lhl77/Typecho-Plugin-AdminBeautifyStore
  */
 
@@ -55,7 +55,7 @@ class AdminBeautifyStore_Plugin implements Typecho_Plugin_Interface
         Typecho_Plugin::factory('admin/footer.php')->begin = array(__CLASS__, 'injectFooter');
 
         // 初始化插件配置，避免访问"设置"页时抛出"配置信息没有找到"
-        Utils\Helper::configPlugin('AdminBeautifyStore', array('_v' => '1', 'notifyOptOut' => '0'));
+        Utils\Helper::configPlugin('AdminBeautifyStore', array('_v' => '1', 'notifyOptOut' => '0', 'downloadMode' => 'server'));
 
         // 确保 backup 目录存在
         if (!is_dir(self::backupDir())) {
@@ -108,6 +108,18 @@ class AdminBeautifyStore_Plugin implements Typecho_Plugin_Interface
             _t('关闭后，将不再在后台页面顶部显示插件有可用更新的横幅通知。')
         );
         $form->addInput($notifyOptOut);
+
+        $downloadMode = new Typecho_Widget_Helper_Form_Element_Radio(
+            'downloadMode',
+            array(
+                'server' => _t('服务器下载（默认）'),
+                'browser' => _t('浏览器下载'),
+            ),
+            'server',
+            _t('下载 / 更新方式'),
+            _t('服务器下载：由服务器直接拉取并解压。浏览器下载：浏览器先缓存 ZIP，再上传到服务器解压。')
+        );
+        $form->addInput($downloadMode);
     }
 
     /** 个人配置（空） */
@@ -141,6 +153,8 @@ class AdminBeautifyStore_Plugin implements Typecho_Plugin_Interface
         } catch (Exception $e) {}
         $notifyOptOut = ($pluginOpts && isset($pluginOpts->notifyOptOut))
             ? (string)$pluginOpts->notifyOptOut : '0';
+        $downloadMode = ($pluginOpts && isset($pluginOpts->downloadMode) && (string)$pluginOpts->downloadMode === 'browser')
+            ? 'browser' : 'server';
 
         // 将已安装的仓库内插件版本信息传递给前端
         $installedMap = self::buildInstalledVersionMap();
@@ -164,6 +178,7 @@ class AdminBeautifyStore_Plugin implements Typecho_Plugin_Interface
             'storeUrl'      => $options->adminUrl . 'extending.php?panel=' . urlencode('AdminBeautifyStore/Panel.php'),
             'cachedAt'      => $cachedAt,
             'notifyOptOut'  => $notifyOptOut,
+            'downloadMode'  => $downloadMode,
         ), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . ';';
         // 所有后台页面：缓存超过 10 分钟时静默刷新；Store 页额外触发页面重载以更新展示
         echo <<<'JS'
@@ -233,6 +248,13 @@ JS;
 
         $cachedAt  = isset($registry['_cached_at']) ? intval($registry['_cached_at']) : 0;
 
+        $pluginOpts = null;
+        try {
+            $pluginOpts = $options->plugin('AdminBeautifyStore');
+        } catch (Exception $e) {}
+        $pageDownloadMode = ($pluginOpts && isset($pluginOpts->downloadMode) && (string)$pluginOpts->downloadMode === 'browser')
+            ? 'browser' : 'server';
+
         $updatedAt = isset($registry['updated']) ? $registry['updated'] : '';
         $cacheAge  = '';
         if ($updatedAt) {
@@ -245,7 +267,7 @@ JS;
         }
 
         ?>
-<div id="abs-root" data-ajax="<?php echo htmlspecialchars($ajaxUrl); ?>" data-token="<?php echo htmlspecialchars($token); ?>" data-cached-at="<?php echo $cachedAt; ?>">
+<div id="abs-root" data-ajax="<?php echo htmlspecialchars($ajaxUrl); ?>" data-token="<?php echo htmlspecialchars($token); ?>" data-cached-at="<?php echo $cachedAt; ?>" data-download-mode="<?php echo htmlspecialchars($pageDownloadMode); ?>">
 
     <!-- 顶部工具栏 -->
     <div class="abs-toolbar">
@@ -544,8 +566,15 @@ JS;
     <!-- 操作进度遮罩 -->
     <div id="abs-progress" class="abs-progress-overlay" style="display:none">
         <div class="abs-progress-card">
-            <div class="abs-spinner"></div>
-            <p id="abs-progress-msg">处理中…</p>
+            <div class="abs-progress-head">
+                <div class="abs-spinner"></div>
+                <div class="abs-progress-meta">
+                    <p id="abs-progress-msg">处理中…</p>
+                    <span id="abs-progress-percent">0%</span>
+                </div>
+            </div>
+            <div class="abs-progress-track"><span id="abs-progress-bar"></span></div>
+            <p id="abs-progress-sub">准备中…</p>
         </div>
     </div>
 
@@ -566,9 +595,13 @@ JS;
 <script>
 (function(){
     var CFG = window.__ABS_CFG__ || {};
-    var ajaxUrl = document.getElementById('abs-root').dataset.ajax;
-    var token   = document.getElementById('abs-root').dataset.token;
+    var rootEl = document.getElementById('abs-root');
+    var ajaxUrl = rootEl.dataset.ajax;
+    var token   = rootEl.dataset.token;
     var downloadApiBase = String(CFG.downloadApiBase || 'https://gh1.lhl.one').replace(/\/+$/, '');
+    // 优先使用当前页面实时注入的设置值，避免读取到旧的全局配置缓存。
+    var downloadMode = String(rootEl.dataset.downloadMode || CFG.downloadMode || 'server') === 'browser' ? 'browser' : 'server';
+    var progressTimer = null;
 
     // ── 将 overlay 移到 body，避免祖先 transform 破坏 position:fixed 定位 ──
     ['abs-progress', 'abs-uninstall-dialog'].forEach(function(id){
@@ -588,24 +621,186 @@ JS;
         }
     }
 
-    function absPost(do_, data, cb){
+    function buildActionForm(do_, data){
         var body = new FormData();
         body.append('do', do_);
         body.append('_', token);
         for(var k in data) body.append(k, data[k]);
+        return body;
+    }
+
+    function absPost(do_, data, cb, onUploadProgress){
+        var body = (typeof FormData !== 'undefined' && data instanceof FormData)
+            ? data
+            : buildActionForm(do_, data);
+        if(typeof onUploadProgress === 'function'){
+            var xhr = new XMLHttpRequest();
+            xhr.open('POST', ajaxUrl, true);
+            xhr.responseType = 'json';
+            console.log('[AB-Store] 开始 POST 请求：', do_);
+            xhr.upload.onprogress = function(evt){
+                onUploadProgress(evt.loaded || 0, evt.total || 0);
+            };
+            xhr.onload = function(){
+                console.log('[AB-Store] POST 完成：', do_, xhr.status, xhr.response ? xhr.response.code : 'no-response');
+                var res = xhr.response;
+                if(!res){
+                    try { res = JSON.parse(xhr.responseText || '{}'); } catch(e) { res = {code:500, message:'响应解析失败'}; }
+                }
+                cb(res || {code:500, message:'空响应'});
+            };
+            xhr.onerror = function(){
+                console.error('[AB-Store] POST 网络错误：', do_);
+                cb({code:500, message:'网络错误'});
+            };
+            xhr.send(body);
+            return;
+        }
+
         fetch(ajaxUrl, {method:'POST', body: body})
             .then(function(r){ return r.json(); })
             .then(cb)
             .catch(function(e){ cb({code:500, message: e.message || '网络错误'}); });
     }
 
-    function showProgress(msg){
+    function setProgress(percent, sub){
+        var p = Math.max(0, Math.min(100, Number(percent) || 0));
+        var bar = document.getElementById('abs-progress-bar');
+        var pct = document.getElementById('abs-progress-percent');
+        var subEl = document.getElementById('abs-progress-sub');
+        if(bar) bar.style.width = p + '%';
+        if(pct) pct.textContent = Math.round(p) + '%';
+        if(subEl && typeof sub === 'string' && sub !== '') subEl.textContent = sub;
+    }
+
+    function showProgress(msg, percent, sub){
         document.getElementById('abs-progress').style.display = 'flex';
         document.getElementById('abs-progress-msg').textContent = msg || '处理中…';
+        setProgress(typeof percent === 'number' ? percent : 6, sub || '准备中…');
     }
 
     function hideProgress(){
+        if(progressTimer){
+            clearInterval(progressTimer);
+            progressTimer = null;
+        }
         document.getElementById('abs-progress').style.display = 'none';
+    }
+
+    function startSoftProgress(msg, stageText){
+        showProgress(msg, 8, stageText || '正在处理…');
+        if(progressTimer) clearInterval(progressTimer);
+        var current = 8;
+        progressTimer = setInterval(function(){
+            if(current >= 90) return;
+            current += (current < 40 ? 5 : (current < 75 ? 3 : 1.2));
+            setProgress(current, stageText || '正在处理…');
+        }, 260);
+    }
+
+    function finishProgressThen(cb, sub){
+        if(progressTimer){
+            clearInterval(progressTimer);
+            progressTimer = null;
+        }
+        setProgress(100, sub || '已完成');
+        setTimeout(function(){
+            hideProgress();
+            if(typeof cb === 'function') cb();
+        }, 220);
+    }
+
+    function toMirrorUrl(url){
+        var raw = String(url || '').trim();
+        if(!raw) return '';
+        if(raw.indexOf(downloadApiBase + '/') === 0) return raw;
+        return downloadApiBase + '/' + raw.replace(/^\/+/, '');
+    }
+
+    function resolveZipUrl(repo, branch, downloadUrl){
+        var direct = String(downloadUrl || '').trim();
+        if(direct) return toMirrorUrl(direct);
+        return toMirrorUrl('https://github.com/' + repo + '/archive/refs/heads/' + branch + '.zip');
+    }
+
+    function downloadZipBlob(url, onProgress){
+        return new Promise(function(resolve, reject){
+            console.log('[AB-Store] 开始下载 ZIP：', url);
+            var xhr = new XMLHttpRequest();
+            xhr.open('GET', url, true);
+            xhr.responseType = 'blob';
+            xhr.onprogress = function(evt){
+                if(typeof onProgress === 'function') onProgress(evt.loaded || 0, evt.total || 0);
+            };
+            xhr.onload = function(){
+                console.log('[AB-Store] ZIP 下载完成：', xhr.status, '大小:', xhr.response ? xhr.response.size : 'unknown');
+                if(xhr.status >= 200 && xhr.status < 300){
+                    resolve(xhr.response);
+                } else {
+                    reject(new Error('镜像下载失败：HTTP ' + xhr.status));
+                }
+            };
+            xhr.onerror = function(){ 
+                console.error('[AB-Store] ZIP 下载出错');
+                reject(new Error('镜像下载失败：网络错误')); 
+            };
+            xhr.send();
+        });
+    }
+
+    function runInstallOrUpgrade(action, payload, name, done){
+        var opName = action === 'upgrade' ? '升级' : '安装';
+
+        if(downloadMode === 'browser'){
+            var zipUrl = resolveZipUrl(payload.repo, payload.branch, payload.downloadUrl);
+            showProgress('正在' + opName + ' ' + name + '…', 4, '准备下载镜像 ZIP…');
+
+            downloadZipBlob(zipUrl, function(loaded, total){
+                var ratio = total > 0 ? (loaded / total) : 0;
+                setProgress(5 + ratio * 58, '正在通过浏览器缓存 ZIP…');
+            })
+            .then(function(blob){
+                setProgress(65, '下载完成，正在上传到服务器…');
+                console.log('[AB-Store] 构建 FormData，ZIP 大小:', blob.size, 'bytes');
+                var req = {
+                    id: payload.id,
+                    dir: payload.dir,
+                    repo: payload.repo,
+                    branch: payload.branch,
+                    subdir: payload.subdir,
+                    downloadUrl: payload.downloadUrl
+                };
+                var form = buildActionForm(action, req);
+                form.append('zipFile', blob, (payload.dir || payload.id || 'plugin') + '.zip');
+                console.log('[AB-Store] FormData 已添加 zipFile 字段');
+
+                return new Promise(function(resolve){
+                    absPost(action, form, function(res){ resolve(res); }, function(loaded, total){
+                        var ratio = total > 0 ? (loaded / total) : 0;
+                        setProgress(66 + ratio * 29, '正在上传 ZIP 到服务器…');
+                    });
+                });
+            })
+            .then(function(res){
+                setProgress(97, '服务器正在解压并部署…');
+                done(res);
+            })
+            .catch(function(err){
+                hideProgress();
+                absToast((action === 'upgrade' ? '升级' : '安装') + '失败：' + (err.message || '网络错误'), 'error');
+            });
+            return;
+        }
+
+        startSoftProgress('正在' + opName + ' ' + name + '…', '服务器正在拉取并解压…');
+        absPost(action, {
+            id: payload.id,
+            dir: payload.dir,
+            repo: payload.repo,
+            branch: payload.branch,
+            subdir: payload.subdir,
+            downloadUrl: payload.downloadUrl
+        }, done);
     }
 
     function absToast(msg, type){
@@ -688,13 +883,15 @@ JS;
 
     // ── 刷新列表 ──
     document.getElementById('abs-refresh-btn').addEventListener('click', function(){
-        showProgress('正在从 GitHub 拉取最新插件列表…');
+        startSoftProgress('正在从 GitHub 拉取最新插件列表…', '服务器正在刷新索引…');
         absPost('refresh', {force: '1'}, function(res){
-            hideProgress();
             if(res.code === 0){
-                absToast('插件列表已更新', 'success');
-                setTimeout(function(){ location.reload(); }, 800);
+                finishProgressThen(function(){
+                    absToast('插件列表已更新', 'success');
+                    setTimeout(function(){ location.reload(); }, 380);
+                }, '刷新完成');
             } else {
+                hideProgress();
                 absToast(res.message || '刷新失败', 'error');
             }
         });
@@ -784,49 +981,61 @@ JS;
                       : (dir || id || '');
 
         if(action === 'install'){
-            showProgress('正在安装 ' + name + '…');
-            absPost('install', {id:id, dir:dir, repo:repo, branch:branch, subdir:subdir, downloadUrl:downloadUrl}, function(res){
-                hideProgress();
+            runInstallOrUpgrade('install', {id:id, dir:dir, repo:repo, branch:branch, subdir:subdir, downloadUrl:downloadUrl}, name, function(res){
                 if(res.code === 0){
                     bumpDownloadCount(downloadKey);
                     recordDownloadCount(downloadKey, {id:id, dir:dir, name:name, repo:repo});
-                    absToast('安装成功：' + name, 'success');
-                    setTimeout(function(){ absNavigate(location.href); }, 800);
+                    finishProgressThen(function(){
+                        if(res.data && res.data.usedMode === 'server-fallback'){
+                            console.warn('[AB-Store] 浏览器上传未命中，已回退服务器下载（安装）:', name);
+                        }
+                        absToast('安装成功：' + name, 'success');
+                        setTimeout(function(){ absNavigate(location.href); }, 350);
+                    }, '安装完成');
                 } else {
+                    hideProgress();
                     absToast('安装失败：' + (res.message || '未知错误'), 'error');
                 }
             });
         } else if(action === 'upgrade'){
-            showProgress('正在升级 ' + name + '…');
-            absPost('upgrade', {id:id, dir:dir, repo:repo, branch:branch, subdir:subdir, downloadUrl:downloadUrl}, function(res){
-                hideProgress();
+            runInstallOrUpgrade('upgrade', {id:id, dir:dir, repo:repo, branch:branch, subdir:subdir, downloadUrl:downloadUrl}, name, function(res){
                 if(res.code === 0){
-                    absToast('升级成功：' + name, 'success');
-                    setTimeout(function(){ absNavigate(location.href); }, 800);
+                    finishProgressThen(function(){
+                        if(res.data && res.data.usedMode === 'server-fallback'){
+                            console.warn('[AB-Store] 浏览器上传未命中，已回退服务器下载（升级）:', name);
+                        }
+                        absToast('升级成功：' + name, 'success');
+                        setTimeout(function(){ absNavigate(location.href); }, 350);
+                    }, '升级完成');
                 } else {
+                    hideProgress();
                     absToast('升级失败：' + (res.message || '未知错误'), 'error');
                 }
             });
         } else if(action === 'enable'){
-            showProgress('正在启用 ' + name + '…');
+            startSoftProgress('正在启用 ' + name + '…', '正在更新插件状态…');
             absPost('togglePlugin', {dir:dir, enable:'1'}, function(res){
-                hideProgress();
                 if(res.code === 0){
-                    absToast(res.message || '已启用：' + name, 'success');
-                    setTimeout(function(){ absNavigate(location.href); }, 800);
+                    finishProgressThen(function(){
+                        absToast(res.message || '已启用：' + name, 'success');
+                        setTimeout(function(){ absNavigate(location.href); }, 350);
+                    }, '已启用');
                 } else {
+                    hideProgress();
                     absToast('启用失败：' + (res.message || '未知错误'), 'error');
                 }
             });
         } else if(action === 'disable'){
-            showProgress('正在禁用 ' + name + '…');
+            startSoftProgress('正在禁用 ' + name + '…', '正在更新插件状态…');
             absPost('togglePlugin', {dir:dir, enable:'0'}, function(res){
-                hideProgress();
                 if(res.code === 0){
-                    absToast(res.message || '已禁用：' + name, 'success');
-                    var redirectUrl = res.data && res.data.redirect ? res.data.redirect : null;
-                    setTimeout(function(){ absNavigate(redirectUrl || location.href); }, 800);
+                    finishProgressThen(function(){
+                        absToast(res.message || '已禁用：' + name, 'success');
+                        var redirectUrl = res.data && res.data.redirect ? res.data.redirect : null;
+                        setTimeout(function(){ absNavigate(redirectUrl || location.href); }, 350);
+                    }, '已禁用');
                 } else {
+                    hideProgress();
                     absToast('禁用失败：' + (res.message || '未知错误'), 'error');
                 }
             });
@@ -857,13 +1066,15 @@ JS;
         var pId   = pendingUninstall.id;
         var pDir  = pendingUninstall.dir;
         closeUninstallDialog();
-        showProgress('正在卸载 ' + pName + '（移入备份）…');
+        startSoftProgress('正在卸载 ' + pName + '（移入备份）…', '服务器正在移动插件目录…');
         absPost('uninstall', {id: pId, dir: pDir, permanent:'0'}, function(res){
-            hideProgress();
             if(res.code === 0){
-                absToast('已卸载并备份：' + pName, 'success');
-                setTimeout(function(){ absNavigate(location.href); }, 800);
+                finishProgressThen(function(){
+                    absToast('已卸载并备份：' + pName, 'success');
+                    setTimeout(function(){ absNavigate(location.href); }, 350);
+                }, '卸载完成');
             } else {
+                hideProgress();
                 absToast('卸载失败：' + (res.message || '未知错误'), 'error');
             }
         });
@@ -876,13 +1087,15 @@ JS;
         var pId   = pendingUninstall.id;
         var pDir  = pendingUninstall.dir;
         closeUninstallDialog();
-        showProgress('正在彻底删除 ' + pName + '…');
+        startSoftProgress('正在彻底删除 ' + pName + '…', '服务器正在删除插件目录…');
         absPost('uninstall', {id: pId, dir: pDir, permanent:'1'}, function(res){
-            hideProgress();
             if(res.code === 0){
-                absToast('已彻底删除：' + pName, 'success');
-                setTimeout(function(){ absNavigate(location.href); }, 800);
+                finishProgressThen(function(){
+                    absToast('已彻底删除：' + pName, 'success');
+                    setTimeout(function(){ absNavigate(location.href); }, 350);
+                }, '删除完成');
             } else {
+                hideProgress();
                 absToast('删除失败：' + (res.message || '未知错误'), 'error');
             }
         });
@@ -1098,9 +1311,15 @@ JS;
 .abs-empty{grid-column:1/-1;padding:48px 24px;text-align:center;color:var(--md-on-surface-variant,#49454f)}
 .abs-empty p{margin:0;font-size:.95rem}
 .abs-progress-overlay{position:fixed;inset:0;z-index:9999;background:color-mix(in srgb,var(--md-surface,#fffbfe) 70%,transparent);display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px)}
-.abs-progress-card{background:var(--md-surface-container,#ece6f0);border-radius:28px;padding:32px 40px;display:flex;flex-direction:column;align-items:center;gap:16px;box-shadow:0 8px 32px rgba(0,0,0,.18);min-width:220px;max-width:90vw;box-sizing:border-box}
-.abs-progress-card p{margin:0;font-size:.95rem;color:var(--md-on-surface,#1c1b1f);text-align:center}
-.abs-spinner{width:44px;height:44px;border:4px solid var(--md-surface-container-highest,#e6e0e9);border-top-color:var(--md-primary,#6750a4);border-radius:50%;animation:abs-spin .7s linear infinite}
+.abs-progress-card{background:var(--md-surface-container,#ece6f0);border-radius:28px;padding:24px 24px 20px;display:flex;flex-direction:column;gap:10px;box-shadow:0 8px 32px rgba(0,0,0,.18);min-width:300px;max-width:92vw;box-sizing:border-box}
+.abs-progress-head{display:flex;align-items:center;gap:12px}
+.abs-progress-meta{display:flex;align-items:baseline;justify-content:space-between;gap:8px;flex:1;min-width:0}
+#abs-progress-msg{margin:0;font-size:.95rem;color:var(--md-on-surface,#1c1b1f);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#abs-progress-percent{font-size:.82rem;color:var(--md-on-surface-variant,#49454f);font-variant-numeric:tabular-nums;flex-shrink:0}
+#abs-progress-sub{margin:0;font-size:.78rem;color:var(--md-on-surface-variant,#49454f)}
+.abs-progress-track{height:8px;border-radius:999px;background:var(--md-surface-container-highest,#e6e0e9);overflow:hidden}
+#abs-progress-bar{display:block;width:0%;height:100%;border-radius:999px;background:linear-gradient(90deg,var(--md-primary,#6750a4),color-mix(in srgb,var(--md-primary,#6750a4) 65%,#76d6ff));transition:width .24s ease}
+.abs-spinner{width:20px;height:20px;border:2.5px solid var(--md-surface-container-highest,#e6e0e9);border-top-color:var(--md-primary,#6750a4);border-radius:50%;animation:abs-spin .7s linear infinite;flex-shrink:0}
 @keyframes abs-spin{to{transform:rotate(360deg)}}
 @keyframes abs-md3-shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
 .abs-dialog-overlay{position:fixed;inset:0;z-index:10000;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity .25s;padding:16px;box-sizing:border-box}
@@ -1127,7 +1346,7 @@ JS;
 .abs-dialog-overlay.abs-dialog-open .abs-dialog{transform:translateY(0) scale(1)}
 .abs-dialog-footer{flex-direction:column-reverse;align-items:stretch}
 .abs-dialog-footer .abs-btn{width:100%;justify-content:center}
-.abs-progress-card{padding:28px 24px;border-radius:24px}
+.abs-progress-card{padding:22px 16px 16px;border-radius:24px;min-width:0;width:100%}
 .abs-toast{bottom:16px;padding:10px 18px;font-size:.85rem}
 }
 @media (prefers-color-scheme: dark){

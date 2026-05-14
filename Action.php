@@ -78,6 +78,7 @@ class AdminBeautifyStore_Action extends Typecho_Widget implements Widget_Interfa
         $dir     = trim($this->request->get('dir', ''));
         $subdir  = trim($this->request->get('subdir', ''));
         $downloadUrl = trim($this->request->get('downloadUrl', ''));
+        $downloadMode = $this->getDownloadMode();
 
         if (empty($repo) || empty($dir)) {
             $this->jsonError('缺少参数 repo / dir', 400);
@@ -91,13 +92,21 @@ class AdminBeautifyStore_Action extends Typecho_Widget implements Widget_Interfa
         // 优先使用 downloadUrl（如 monorepo 的 Release 直链），否则回退到 GitHub archive
         $isDirect = !empty($downloadUrl);
         $zipUrl   = $isDirect ? $downloadUrl : "https://github.com/{$repo}/archive/refs/heads/{$branch}.zip";
-        $result = $this->downloadAndExtract($zipUrl, $repo, $branch, $dir, $subdir, $targetDir, $isDirect);
+
+        $uploadTmp = $this->getUploadedZipTmpPath();
+        $fallbackToServer = ($downloadMode === 'browser' && !$uploadTmp);
+
+        if ($uploadTmp) {
+            $result = $this->extractZipToTarget($uploadTmp, $repo, $branch, $subdir, $targetDir, $isDirect);
+        } else {
+            $result = $this->downloadAndExtract($zipUrl, $repo, $branch, $subdir, $targetDir, $isDirect);
+        }
 
         if ($result !== true) {
             $this->jsonError($result, 500);
         }
 
-        $this->jsonSuccess(array('dir' => $dir), '安装成功');
+        $this->jsonSuccess(array('dir' => $dir, 'usedMode' => $fallbackToServer ? 'server-fallback' : ($uploadTmp ? 'browser' : 'server')), $fallbackToServer ? '安装成功（已自动回退服务器下载）' : '安装成功');
     }
 
     /**
@@ -165,6 +174,7 @@ class AdminBeautifyStore_Action extends Typecho_Widget implements Widget_Interfa
         $dir    = trim($this->request->get('dir', ''));
         $subdir = trim($this->request->get('subdir', ''));
         $downloadUrl = trim($this->request->get('downloadUrl', ''));
+        $downloadMode = $this->getDownloadMode();
 
         if (empty($repo) || empty($dir)) {
             $this->jsonError('缺少参数 repo / dir', 400);
@@ -209,7 +219,15 @@ class AdminBeautifyStore_Action extends Typecho_Widget implements Widget_Interfa
         // 2. 下载新版本（优先使用 downloadUrl 直链，否则回退到 GitHub archive）
         $isDirect = !empty($downloadUrl);
         $zipUrl   = $isDirect ? $downloadUrl : "https://github.com/{$repo}/archive/refs/heads/{$branch}.zip";
-        $result = $this->downloadAndExtract($zipUrl, $repo, $branch, $dir, $subdir, $targetDir, $isDirect);
+
+        $uploadTmp = $this->getUploadedZipTmpPath();
+        $fallbackToServer = ($downloadMode === 'browser' && !$uploadTmp);
+
+        if ($uploadTmp) {
+            $result = $this->extractZipToTarget($uploadTmp, $repo, $branch, $subdir, $targetDir, $isDirect);
+        } else {
+            $result = $this->downloadAndExtract($zipUrl, $repo, $branch, $subdir, $targetDir, $isDirect);
+        }
 
         if ($result !== true) {
             $this->jsonError($result, 500);
@@ -236,7 +254,7 @@ class AdminBeautifyStore_Action extends Typecho_Widget implements Widget_Interfa
             }
         }
 
-        $this->jsonSuccess(array('dir' => $dir), '升级成功');
+        $this->jsonSuccess(array('dir' => $dir, 'usedMode' => $fallbackToServer ? 'server-fallback' : ($uploadTmp ? 'browser' : 'server')), $fallbackToServer ? '升级成功（已自动回退服务器下载）' : '升级成功');
     }
 
     /**
@@ -593,13 +611,13 @@ class AdminBeautifyStore_Action extends Typecho_Widget implements Widget_Interfa
      * @param bool   $isDirect  true = 直链 ZIP（Release），自动探测内部目录结构；false = GitHub archive ZIP
      * @return true|string      成功返回 true，失败返回错误消息
      */
-    private function downloadAndExtract($zipUrl, $repo, $branch, $dir, $subdir, $targetDir, $isDirect = false)
+    private function downloadAndExtract($zipUrl, $repo, $branch, $subdir, $targetDir, $isDirect = false)
     {
         if (!class_exists('ZipArchive')) {
             return 'PHP ZipArchive 扩展未安装，无法解压 ZIP';
         }
 
-        // 下载 ZIP 到临时文件（github.com / codeload.github.com 走镜像兜底）
+        // 下载 ZIP 到临时文件（统一走 gh1.lhl.one 镜像）
         $tmpFile = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'abs_' . md5($zipUrl . time()) . '.zip';
 
         $ctx = stream_context_create(array(
@@ -616,32 +634,29 @@ class AdminBeautifyStore_Action extends Typecho_Widget implements Widget_Interfa
             ),
         ));
 
-        // 对 github.com / codeload.github.com 的 ZIP 统一走 gh1.lhl.one 镜像
-        $isGithubUrl = (strpos($zipUrl, 'github.com') !== false);
-        $mirrors = $isGithubUrl
-            ? array('https://gh1.lhl.one/')
-            : array('');
-        $zipContent = false;
-        foreach ($mirrors as $prefix) {
-            $tryUrl = $prefix . $zipUrl;
-            $zipContent = @file_get_contents($tryUrl, false, $ctx);
-            if ($zipContent !== false && strlen($zipContent) >= 100) {
-                break;
-            }
-            $zipContent = false;
-        }
+        $mirrorUrl = $this->toGhMirrorUrl($zipUrl);
+        $zipContent = @file_get_contents($mirrorUrl, false, $ctx);
         if ($zipContent === false) {
-            return "下载失败：{$zipUrl}";
+            return "下载失败：{$mirrorUrl}";
         }
 
         if (@file_put_contents($tmpFile, $zipContent) === false) {
             return '无法写入临时文件：' . $tmpFile;
         }
 
+        $result = $this->extractZipToTarget($tmpFile, $repo, $branch, $subdir, $targetDir, $isDirect);
+        @unlink($tmpFile);
+        return $result;
+    }
+
+    /**
+     * 将 ZIP 解压到目标目录
+     */
+    private function extractZipToTarget($zipFile, $repo, $branch, $subdir, $targetDir, $isDirect = false)
+    {
         // 解压
         $zip = new ZipArchive();
-        if ($zip->open($tmpFile) !== true) {
-            @unlink($tmpFile);
+        if ($zip->open($zipFile) !== true) {
             return 'ZIP 文件损坏或无法打开';
         }
 
@@ -718,7 +733,6 @@ class AdminBeautifyStore_Action extends Typecho_Widget implements Widget_Interfa
         }
 
         $zip->close();
-        @unlink($tmpFile);
 
         if (!$extracted) {
             // 尝试不带 subdir 前缀直接解压（兜底）
@@ -726,6 +740,87 @@ class AdminBeautifyStore_Action extends Typecho_Widget implements Widget_Interfa
         }
 
         return true;
+    }
+
+    /**
+     * 插件设置中的下载/更新方式
+     */
+    private function getDownloadMode()
+    {
+        $mode = '';
+        if ($this->pluginOptions && isset($this->pluginOptions->downloadMode)) {
+            $mode = (string)$this->pluginOptions->downloadMode;
+        }
+        return $mode === 'browser' ? 'browser' : 'server';
+    }
+
+    /**
+     * 获取浏览器上传的 ZIP 临时文件路径
+     */
+    private function getUploadedZipTmpPath()
+    {
+        $downloadMode = $this->getDownloadMode();
+        if ($downloadMode === 'browser' && (empty($_FILES['zipFile']) || !is_array($_FILES['zipFile']))) {
+            error_log('[AB-Store] 诊断：浏览器模式已启用，但未收到 $_FILES[zipFile]。$_POST 内容：' . json_encode($_POST) . '，$_FILES 内容：' . json_encode($_FILES));
+        }
+        if (empty($_FILES['zipFile']) || !is_array($_FILES['zipFile'])) {
+            return '';
+        }
+
+        $file = $_FILES['zipFile'];
+        $error = isset($file['error']) ? (int)$file['error'] : UPLOAD_ERR_NO_FILE;
+        if ($error === UPLOAD_ERR_NO_FILE) {
+            error_log('[AB-Store] 诊断：UPLOAD_ERR_NO_FILE，可能是浏览器上传流程异常');
+            return '';
+        }
+        if ($error !== UPLOAD_ERR_OK) {
+            error_log('[AB-Store] 诊断：上传错误代码 ' . $error . '：' . $this->uploadErrorMessage($error));
+            $this->jsonError('上传失败：' . $this->uploadErrorMessage($error), 400);
+        }
+
+        $tmpPath = isset($file['tmp_name']) ? (string)$file['tmp_name'] : '';
+        if ($tmpPath === '' || !is_uploaded_file($tmpPath)) {
+            $this->jsonError('上传失败：临时文件不可用', 400);
+        }
+
+        $name = strtolower((string)(isset($file['name']) ? $file['name'] : ''));
+        if ($name !== '' && substr($name, -4) !== '.zip') {
+            $this->jsonError('上传失败：仅支持 ZIP 文件', 400);
+        }
+
+        return $tmpPath;
+    }
+
+    /**
+     * 统一通过 gh1.lhl.one 镜像下载
+     */
+    private function toGhMirrorUrl($url)
+    {
+        $url = trim((string)$url);
+        if ($url === '') return '';
+        if (strpos($url, 'https://gh1.lhl.one/') === 0) {
+            return $url;
+        }
+        return 'https://gh1.lhl.one/' . ltrim($url, '/');
+    }
+
+    private function uploadErrorMessage($errorCode)
+    {
+        switch ((int)$errorCode) {
+            case UPLOAD_ERR_INI_SIZE:
+            case UPLOAD_ERR_FORM_SIZE:
+                return '文件超过服务器限制';
+            case UPLOAD_ERR_PARTIAL:
+                return '文件上传不完整';
+            case UPLOAD_ERR_NO_TMP_DIR:
+                return '服务器临时目录不可用';
+            case UPLOAD_ERR_CANT_WRITE:
+                return '服务器写入失败';
+            case UPLOAD_ERR_EXTENSION:
+                return '上传被扩展阻止';
+            default:
+                return '未知错误';
+        }
     }
 
     /**
