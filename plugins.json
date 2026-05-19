@@ -1,6 +1,6 @@
 {
   "schema": "1.0",
-  "updated": "2026-05-19T08:30:00Z",
+  "updated": "2026-05-19T08:31:00Z",
   "plugins": [
     {
       "id": "AB-Store",
@@ -63,7 +63,7 @@
       "branch": "main",
       "downloadUrl": "https://github.com/lhl77/Typecho-Plugin-LinksPlus/archive/refs/tags/v1.4.0.zip",
       "homepage": "https://github.com/lhl77/Typecho-Plugin-LinksPlus",
-      "tags": ["链接管理", "友情链接"],
+      "tags": ["链接管理", "友情链接","推荐"],
       "changelog": "https://github.com/lhl77/Typecho-Plugin-LinksPlus/releases"
     },
     {
