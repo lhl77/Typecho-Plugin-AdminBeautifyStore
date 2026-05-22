@@ -56,14 +56,14 @@
       "description": "友情链接管理插件，Material Design 3 风格，支持分组、模板自定义、主题预览、友链可用性检查",
       "author": "LHL",
       "authorUrl": "https://blog.lhl.one",
-      "version": "1.4.1",
+      "version": "2.0.0",
       "repo": "lhl77/Typecho-Plugin-LinksPlus",
       "directory": "Links",
       "subDirectory": "",
       "branch": "main",
-      "downloadUrl": "https://github.com/lhl77/Typecho-Plugin-LinksPlus/archive/refs/tags/v1.4.1.zip",
+      "downloadUrl": "https://github.com/lhl77/Typecho-Plugin-LinksPlus/archive/refs/tags/v2.0.0.zip",
       "homepage": "https://github.com/lhl77/Typecho-Plugin-LinksPlus",
-      "tags": ["链接管理", "友情链接","推荐"],
+      "tags": ["付费插件","链接管理", "友情链接","推荐"],
       "changelog": "https://github.com/lhl77/Typecho-Plugin-LinksPlus/releases"
     },
     {
