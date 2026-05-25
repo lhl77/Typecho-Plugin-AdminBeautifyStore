@@ -59,7 +59,7 @@
       "version": "2.0.0",
       "repo": "lhl77/Typecho-Plugin-LinksPlus",
       "directory": "Links",
-      "subDirectory": "",
+      "subDirectory": "Links",
       "branch": "main",
       "downloadUrl": "https://github.com/lhl77/Typecho-Plugin-LinksPlus/releases/download/v2.0.0/Links.zip",
       "homepage": "https://github.com/lhl77/Typecho-Plugin-LinksPlus",
