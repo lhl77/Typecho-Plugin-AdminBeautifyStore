@@ -1,6 +1,6 @@
 {
   "schema": "1.0",
-  "updated": "2026-05-26T12:52:00Z",
+  "updated": "2026-05-26T13:12:00Z",
   "plugins": [
     {
       "id": "AB-Store",
@@ -63,7 +63,7 @@
       "branch": "main",
       "downloadUrl": "https://github.com/lhl77/TypechoBio/releases/download/v1.0.0/TypechoBio.zip",
       "homepage": "https://blog.lhl.one/artical/1263.html",
-      "tags": ["个人主页","多域名"],
+      "tags": ["个人主页","多域名","推荐"],
       "changelog": "https://github.com/lhl77/TypechoBio"
     },
     {
