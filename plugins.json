@@ -1,6 +1,6 @@
 {
   "schema": "1.0",
-  "updated": "2026-05-28T02:02:00Z",
+  "updated": "2026-05-28T02:48:00Z",
   "plugins": [
     {
       "id": "AB-Store",
@@ -320,6 +320,22 @@
       "downloadUrl": "https://github.com/lhl77/Typecho-Plugin-AdminBeautifyStore/releases/download/%E6%8F%92%E4%BB%B6%E4%BB%93%E5%BA%93ZIP%E5%8C%85/ThemePluginManager_v1.0.0.zip",
       "homepage": "https://blog.qgdnmb.xyz/2026/05/27/%E4%B8%BB%E9%A2%98%E4%B8%8E%E6%8F%92%E4%BB%B6%E4%B8%8A%E4%BC%A0%E5%AE%89%E8%A3%85%E5%8D%B8%E8%BD%BD%E6%8F%92%E4%BB%B6.html",
       "tags": ["插件管理","主题管理"],
+      "changelog": ""
+    },
+    {
+      "id": "RobotsPlusPlus",
+      "name": "Robots++",
+      "description": "Typecho蜘蛛来访记录插件加强版的加强版 ",
+      "author": "Ryan, YoviSun, Shion",
+      "authorUrl": "https://github.com/benzbrake/RobotsPlusPlus",
+      "version": "2.0.8",
+      "repo": "benzbrake/RobotsPlusPlus",
+      "directory": "RobotsPlusPlus",
+      "subDirectory": "RobotsPlusPlus",
+      "branch": "main",
+      "downloadUrl": "https://github.com/lhl77/Typecho-Plugin-AdminBeautifyStore/releases/download/%E6%8F%92%E4%BB%B6%E4%BB%93%E5%BA%93ZIP%E5%8C%85/RobotsPlusPlus_v2.0.8.zip",
+      "homepage": "https://xiamp.net/archives/typecho-spider-visit-record-plugin-enhanced-enhanced-version-robotsplusplus.html",
+      "tags": ["蜘蛛","统计"],
       "changelog": ""
     }
   ]
