@@ -1,6 +1,6 @@
 {
   "schema": "1.0",
-  "updated": "2026-06-08T05:59:00Z",
+  "updated": "2026-06-11T04:02:00Z",
   "plugins": [
     {
       "id": "AB-Store",
@@ -40,12 +40,12 @@
       "description": "Typecho 的 AdminBeautify 专用头像管理插件 · Gravatar 代理 / 自定义上传 / PicUp 集成",
       "author": "LHL",
       "authorUrl": "https://blog.lhl.one",
-      "version": "1.0.1",
+      "version": "1.0.2",
       "repo": "lhl77/Typecho-Plugin-AdminBeautifyAvatar",
       "directory": "AdminBeautifyAvatar",
       "subDirectory": "AdminBeautifyAvatar",
       "branch": "main",
-      "downloadUrl": "https://github.com/lhl77/Typecho-Plugin-AdminBeautifyAvatar/releases/download/v1.0.1/AdminBeautifyAvatar.zip",
+      "downloadUrl": "https://github.com/lhl77/Typecho-Plugin-AdminBeautifyAvatar/releases/download/v1.0.2/AdminBeautifyAvatar_v1.0.2.zip",
       "homepage": "https://blog.lhl.one/artical/1217.html",
       "tags": ["头像源","推荐"],
       "changelog": "https://github.com/lhl77/Typecho-Plugin-AdminBeautifyAvatar/releases"
@@ -104,12 +104,12 @@
       "description": "外部链接自动跳转插件，为站外链接添加中间跳转页，防止直接外链，支持白名单",
       "author": "LHL",
       "authorUrl": "https://blog.lhl.one",
-      "version": "1.0.2",
+      "version": "1.0.3",
       "repo": "lhl77/Typecho-Plugin-LinkGo",
       "directory": "LinkGo",
       "subDirectory": "LinkGo",
       "branch": "main",
-      "downloadUrl": "https://github.com/lhl77/Typecho-Plugin-LinkGo/releases/download/v1.0.2/LinkGo_v1.0.2.zip",
+      "downloadUrl": "https://github.com/lhl77/Typecho-Plugin-LinkGo/releases/download/v1.0.3/LinkGo_v1.0.3.zip",
       "homepage": "https://github.com/lhl77/Typecho-Plugin-LinkGo",
       "tags": ["链接管理", "SEO", "推荐"],
       "changelog": "https://github.com/lhl77/Typecho-Plugin-LinkGo/releases"
@@ -248,12 +248,12 @@
       "description": "多存储后端图片上传&处理插件，支持多种远程存储服务，支持上传前图片处理，多 Profile 通过 JSON 存储，可随时切换。 ",
       "author": "LHL",
       "authorUrl": "https://blog.lhl.one",
-      "version": "1.2.5",
+      "version": "1.2.6",
       "repo": "lhl77/Typecho-Plugin-PicUp",
       "directory": "PicUp",
       "subDirectory": "PicUp",
       "branch": "main",
-      "downloadUrl": "https://github.com/lhl77/Typecho-Plugin-PicUp/releases/download/v1.2.5/PicUp.zip",
+      "downloadUrl": "https://github.com/lhl77/Typecho-Plugin-PicUp/releases/download/v1.2.6/PicUp_v1.2.6.zip",
       "homepage": "https://blog.lhl.one/artical/1026.html",
       "tags": ["图床","图片处理", "推荐"],
       "changelog": "https://github.com/lhl77/Typecho-Plugin-PicUp/releases"
