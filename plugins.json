@@ -356,8 +356,8 @@
     },
     {
       "id": "TypechoPaid",
-      "name": "TypechoPaid",
-      "description": "Typecho 文章 SEO 元信息增强插件 · 支持 AI 自动生成 Description / Keywords",
+      "name": "Paid for Typecho",
+      "description": "一个文章付费与订阅插件，支持单篇付费和订阅计划，内置多种支付通道和可定制主题，通过自定义字段灵活控制付费属性",
       "author": "LHL",
       "authorUrl": "https://blog.lhl.one",
       "version": "1.0.0",
