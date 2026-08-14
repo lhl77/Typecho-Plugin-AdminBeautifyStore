@@ -57,6 +57,9 @@ class AdminBeautifyStore_Action extends Typecho_Widget implements Widget_Interfa
             case 'togglePlugin':
                 $this->handleTogglePlugin();
                 break;
+            case 'blockUpdate':
+                $this->handleBlockUpdate();
+                break;
             default:
                 $this->jsonError('未知操作', 400);
         }
@@ -358,6 +361,9 @@ class AdminBeautifyStore_Action extends Typecho_Widget implements Widget_Interfa
         $plugins      = isset($registry['plugins']) ? $registry['plugins'] : array();
         $installedMap = AdminBeautifyStore_Plugin::buildInstalledVersionMap();
 
+        // 读取屏蔽更新配置，屏蔽的插件不进入通知
+        $updateBlock = AdminBeautifyStore_Plugin::getUpdateBlock();
+
         $updates = array();
         foreach ($plugins as $p) {
             $dir       = isset($p['directory']) ? $p['directory'] : '';
@@ -365,6 +371,9 @@ class AdminBeautifyStore_Action extends Typecho_Widget implements Widget_Interfa
             if (!$dir || !isset($installedMap[$dir])) continue;
             $localVer = $installedMap[$dir];
             if ($remoteVer && $localVer && version_compare($remoteVer, $localVer, '>')) {
+                if (isset($updateBlock['all'][$dir]) || isset($updateBlock['versions'][$dir][$remoteVer])) {
+                    continue;
+                }
                 $updates[] = array(
                     'id'        => isset($p['id'])   ? $p['id']   : $dir,
                     'name'      => isset($p['name']) ? $p['name'] : $dir,
@@ -593,6 +602,51 @@ class AdminBeautifyStore_Action extends Typecho_Widget implements Widget_Interfa
             while (ob_get_level() > $obLevel) ob_end_clean();
             $this->jsonError($e->getMessage(), 500);
         }
+    }
+
+    /**
+     * 屏蔽/解除屏蔽更新
+     * 参数：dir（插件目录）、version（可选，新版本号）、mode（version=屏蔽本次更新 / all=屏蔽全部更新 / clear=解除屏蔽）
+     */
+    private function handleBlockUpdate()
+    {
+        $this->checkAdmin();
+
+        $dir    = trim($this->request->get('dir', ''));
+        $ver    = trim($this->request->get('version', ''));
+        $mode   = trim($this->request->get('mode', 'version'));
+
+        if (empty($dir)) {
+            $this->jsonError('缺少参数 dir', 400);
+        }
+        // 安全：不允许路径穿越
+        if (strpos($dir, '..') !== false || strpos($dir, '/') !== false || strpos($dir, '\\') !== false) {
+            $this->jsonError('非法目录名', 400);
+        }
+
+        $block = AdminBeautifyStore_Plugin::getUpdateBlock();
+
+        if ($mode === 'all') {
+            $block['all'][$dir] = true;
+            $msg = '已屏蔽该插件全部更新';
+        } elseif ($mode === 'clear') {
+            unset($block['all'][$dir]);
+            unset($block['versions'][$dir]);
+            $msg = '已解除屏蔽更新';
+        } else {
+            // 屏蔽本次更新（指定版本）
+            if (empty($ver)) {
+                $this->jsonError('缺少参数 version', 400);
+            }
+            if (!isset($block['versions'])) $block['versions'] = array();
+            if (!isset($block['versions'][$dir])) $block['versions'][$dir] = array();
+            $block['versions'][$dir][$ver] = true;
+            $msg = '已屏蔽本次更新';
+        }
+
+        AdminBeautifyStore_Plugin::setUpdateBlock($block);
+
+        $this->jsonSuccess(array('dir' => $dir, 'mode' => $mode), $msg);
     }
 
     // ================================================================

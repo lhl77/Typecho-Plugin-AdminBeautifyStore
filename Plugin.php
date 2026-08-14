@@ -5,7 +5,7 @@
  *
  * @package   AB-Store
  * @author    LHL
- * @version   1.0.20
+ * @version   1.0.21
  * @link      https://github.com/lhl77/Typecho-Plugin-AdminBeautifyStore
  */
 
@@ -222,6 +222,25 @@ JS;
         $installedDirs = self::getInstalledPluginDirs();
         $installedMap  = self::buildInstalledVersionMap();
         $activatedMap  = self::buildActivatedMap();
+        $updateBlock   = self::getUpdateBlock();
+
+        // 注入内置插件：AB Editor（AdminBeautify 内置编辑器增强，不在远端 plugins.json 中）
+        $abEditorBuiltin = array(
+            'id'          => 'ABEditor',
+            'name'        => 'AB Editor',
+            'description' => 'AB Admin 内置编辑器，包含三种模式（原版优化，Vditor，Editor.md），均对Typecho做了深度的优化，开箱即用。',
+            'author'      => 'LHL',
+            'authorUrl'   => 'https://lhl.one',
+            'version'     => isset($installedMap['AdminBeautify']) ? $installedMap['AdminBeautify'] : '2.1.43',
+            'repo'        => 'lhl77/Typecho-Plugin-AdminBeautify',
+            'directory'   => 'AdminBeautify',
+            'homepage'    => 'https://blog.lhl.one/artical/1232.html',
+            'tags'        => array('编辑器', '推荐'),
+            'branch'      => 'main',
+            'downloadUrl' => '',
+            'subDirectory'=> '',
+        );
+        array_unshift($plugins, $abEditorBuiltin);
 
         // 统计
         $totalCount     = count($plugins);
@@ -241,7 +260,8 @@ JS;
                 $remoteVer  = isset($p['version']) ? $p['version'] : '';
                 $localVer   = isset($installedMap[$dir]) ? $installedMap[$dir] : '';
                 if ($remoteVer && $localVer && version_compare($remoteVer, $localVer, '>')) {
-                    $updateCount++;
+                    $isBlocked = isset($updateBlock['all'][$dir]) || isset($updateBlock['versions'][$dir][$remoteVer]);
+                    if (!$isBlocked) $updateCount++;
                 }
             }
         }
@@ -361,9 +381,31 @@ JS;
             $isActivated  = $isInstalled && isset($activatedMap[$pdir]);
             $localVer     = $isInstalled && isset($installedMap[$pdir]) ? $installedMap[$pdir] : '';
             $hasUpdate    = $isInstalled && $pver && $localVer && version_compare($pver, $localVer, '>');
+            // 屏蔽更新检测
+            $blockedAll = isset($updateBlock['all'][$pdir]);
+            $blockedVer = isset($updateBlock['versions'][$pdir][$pver]);
+            $isBlocked  = $blockedAll || $blockedVer;
+            // 是否真正提供更新（未被屏蔽）
+            $effectiveUpdate = $hasUpdate && !$isBlocked;
+            // Links+ 1.x → 2.x 付费升级提示
+            $isPaidUpgrade = false;
+            if ($hasUpdate && $pdir === 'Links' && strpos((string)$localVer, '1.') === 0 && strpos((string)$pver, '2.') === 0) {
+                $isPaidUpgrade = true;
+            }
             // 是否为自身（禁用/卸载自身会产生循环依赖，需特殊处理）
             $isSelf       = ($pdir === 'AdminBeautifyStore');
-            // 只对已激活且插件具有 config() 方法的插件显示"设置"按钮
+            // 是否为内置插件（AB Editor：不显示禁用按钮，设置链接到 AdminBeautify 的编辑器定位）
+            $isBuiltin    = ($pid === 'ABEditor');
+            // 是否带"编辑器"标签（安装前提醒用户可用 AB Editor 内置编辑器）
+            $hasEditorTag = false;
+            if (!$isBuiltin) {
+                foreach ($ptags as $tag) {
+                    if (mb_strpos((string)$tag, '编辑器', 0, 'UTF-8') !== false) {
+                        $hasEditorTag = true;
+                        break;
+                    }
+                }
+            }
             // 使用 \Typecho\Plugin::parseInfo() 做 token 分析而非 class_exists()：
             //   1. Typecho 1.3+ 插件使用命名空间（TypechoPlugin\{Dir}\Plugin），class_exists('{Dir}_Plugin') 恒为 false
             //   2. 插件类在渲染页面时未被 require，Plugin::init() 只加载钩子数据，不加载插件文件
@@ -384,10 +426,14 @@ JS;
             $settingsUrl  = $hasConfig
                 ? $options->adminUrl . 'options-plugin.php?config=' . urlencode($pdir)
                 : '';
+            // 内置 AB Editor 的设置按钮：直达 AdminBeautify 设置页并定位到编辑器项
+            if ($isBuiltin) {
+                $settingsUrl = $options->adminUrl . 'options-plugin.php?config=AdminBeautify&to=editor_vditor';
+            }
             $cardClass = 'abs-card';
             if ($isInstalled && $isActivated) $cardClass .= ' abs-card-active';
             if ($isInstalled && !$isActivated) $cardClass .= ' abs-card-disabled';
-            if ($hasUpdate)   $cardClass .= ' abs-card-update';
+            if ($effectiveUpdate) $cardClass .= ' abs-card-update';
             if ($isFeatured)  $cardClass .= ' abs-card-featured';
         ?>
         <div class="<?php echo $cardClass; ?>"
@@ -397,8 +443,12 @@ JS;
              data-download-key="<?php echo htmlspecialchars($downloadKey); ?>"
              data-installed="<?php echo $isInstalled ? '1' : '0'; ?>"
              data-activated="<?php echo $isActivated ? '1' : '0'; ?>"
-             data-has-update="<?php echo $hasUpdate ? '1' : '0'; ?>"
-             data-filter-tags="<?php echo htmlspecialchars(implode(' ', $displayTags)); ?>">
+             data-has-update="<?php echo $effectiveUpdate ? '1' : '0'; ?>"
+             data-filter-tags="<?php echo htmlspecialchars(implode(' ', $displayTags)); ?>"
+             data-editor-tag="<?php echo $hasEditorTag ? '1' : '0'; ?>"
+             data-paid-upgrade="<?php echo $isPaidUpgrade ? '1' : '0'; ?>"
+             data-blocked-all="<?php echo $blockedAll ? '1' : '0'; ?>"
+             data-blocked-version="<?php echo $blockedVer ? '1' : '0'; ?>">
 
             <div class="abs-card-header">
                 <div class="abs-card-avatar<?php echo $isInstalled && !$isActivated ? ' abs-avatar-disabled' : ''; ?>">
@@ -413,11 +463,13 @@ JS;
                                 <a href="<?php echo htmlspecialchars($pauthorU); ?>" target="_blank" rel="noopener"><?php echo htmlspecialchars($pauthor); ?></a>
                                 <?php else: echo htmlspecialchars($pauthor); endif; ?>
                             </span>
+                            <?php if (!$isSelf && !$isBuiltin): ?>
                             <span style="opacity:0.4;font-size:0.75rem;flex-shrink:0">•</span>
                             <span class="abs-download" data-download-key="<?php echo htmlspecialchars($downloadKey); ?>" data-count="" title="安装次数" style="flex-shrink:0">
                                 <span class="abs-icon" style="font-size:0.95rem">download</span>
                                 <span class="abs-download-text"><span class="abs-download-skeleton" style="width:24px;height:10px;vertical-align:middle;display:inline-block"></span></span>
                             </span>
+                            <?php endif; ?>
                         </div>
                     </div>
                 </div>
@@ -425,7 +477,9 @@ JS;
                     <?php if ($isFeatured): ?>
                     <span class="abs-badge abs-badge-featured"><span class="abs-icon" style="font-size:.75rem">auto_awesome</span>推荐</span>
                     <?php endif; ?>
-                    <?php if ($hasUpdate): ?>
+                    <?php if ($isBlocked): ?>
+                    <span class="abs-badge abs-badge-blocked">已屏蔽更新</span>
+                    <?php elseif ($effectiveUpdate): ?>
                     <span class="abs-badge abs-badge-update">新版本 <?php echo htmlspecialchars($pver); ?></span>
                     <?php elseif ($isActivated): ?>
                     <span class="abs-badge abs-badge-active"><span class="abs-icon" style="font-size:.75rem">check_circle</span>启用中</span>
@@ -447,6 +501,7 @@ JS;
 
             <div class="abs-card-footer">
                 <div class="abs-card-ver">
+                    <?php if (!$isBuiltin): ?>
                     <?php if ($isInstalled && $localVer): ?>
                         <?php if ($hasUpdate): ?>
                         <span title="本地版本"><?php echo htmlspecialchars($localVer); ?></span>
@@ -457,6 +512,7 @@ JS;
                         <?php endif; ?>
                     <?php elseif ($pver): ?>
                     <span><?php echo htmlspecialchars($pver); ?></span>
+                    <?php endif; ?>
                     <?php endif; ?>
                     <?php if ($prepo): ?>
                     <a href="https://github.com/<?php echo htmlspecialchars($prepo); ?>" target="_blank" rel="noopener" class="abs-card-repo" title="GitHub 仓库">
@@ -471,43 +527,76 @@ JS;
                 </div>
                 <div class="abs-card-actions">
                     <?php if ($hasUpdate): ?>
+                    <?php if ($effectiveUpdate): ?>
                     <button class="abs-btn abs-btn-filled abs-action-btn"
                             data-action="upgrade"
                             data-id="<?php echo htmlspecialchars($pid); ?>"
                             data-dir="<?php echo htmlspecialchars($pdir); ?>"
+                            data-version="<?php echo htmlspecialchars($pver); ?>"
                             data-repo="<?php echo htmlspecialchars($prepo); ?>"
                             data-branch="<?php echo htmlspecialchars($pbranch); ?>"
                             data-subdir="<?php echo htmlspecialchars($psubDir); ?>"
                             data-downloadurl="<?php echo htmlspecialchars($pdownloadUrl); ?>">
                         <span class="abs-icon">system_update</span>升级
                     </button>
-                    <?php if ($isActivated): ?>
-                    <?php if ($settingsUrl): ?>
-                    <a href="<?php echo htmlspecialchars($settingsUrl); ?>" class="abs-btn abs-btn-text" title="插件设置">
-                        <span class="abs-icon">settings</span>设置
-                    </a>
                     <?php endif; ?>
-                    <?php if ($isSelf): ?>
-                    <a href="<?php echo htmlspecialchars($pluginsUrl); ?>" class="abs-btn abs-btn-text" title="在 Typecho 插件管理页禁用或卸载">
-                        <span class="abs-icon">open_in_new</span>管理
-                    </a>
-                    <?php else: ?>
-                    <button class="abs-btn abs-btn-text abs-action-btn"
-                            data-action="disable"
-                            data-id="<?php echo htmlspecialchars($pid); ?>"
-                            data-dir="<?php echo htmlspecialchars($pdir); ?>">
-                        <span class="abs-icon">pause_circle_outline</span>禁用
-                    </button>
-                    <?php endif; ?>
-                    <?php endif; ?>
-                    <?php if (!$isActivated && !$isSelf): ?>
-                    <button class="abs-btn abs-btn-text abs-action-btn abs-btn-danger-text"
-                            data-action="uninstall"
-                            data-id="<?php echo htmlspecialchars($pid); ?>"
-                            data-dir="<?php echo htmlspecialchars($pdir); ?>">
-                        <span class="abs-icon">delete_outline</span>卸载
-                    </button>
-                    <?php endif; ?>
+                    <!-- 其他操作下拉 -->
+                    <div class="abs-more-wrap">
+                        <button type="button" class="abs-btn abs-btn-text abs-more-btn" data-more-btn>
+                            <span class="abs-icon">more_horiz</span>其他操作
+                        </button>
+                        <div class="abs-more-menu" data-more-menu>
+                            <?php if ($isActivated): ?>
+                                <?php if ($settingsUrl): ?>
+                                <a href="<?php echo htmlspecialchars($settingsUrl); ?>" class="abs-more-item" title="插件设置">
+                                    <span class="abs-icon">settings</span>设置
+                                </a>
+                                <?php endif; ?>
+                                <?php if ($isSelf): ?>
+                                <a href="<?php echo htmlspecialchars($pluginsUrl); ?>" class="abs-more-item" title="在 Typecho 插件管理页禁用或卸载">
+                                    <span class="abs-icon">open_in_new</span>管理
+                                </a>
+                                <?php elseif (!$isBuiltin): ?>
+                                <button type="button" class="abs-more-item abs-action-btn"
+                                        data-action="disable"
+                                        data-id="<?php echo htmlspecialchars($pid); ?>"
+                                        data-dir="<?php echo htmlspecialchars($pdir); ?>"
+                                        data-name="<?php echo htmlspecialchars($pname); ?>">
+                                    <span class="abs-icon">pause_circle_outline</span>禁用
+                                </button>
+                                <?php endif; ?>
+                            <?php else: ?>
+                                <?php if (!$isSelf): ?>
+                                <button type="button" class="abs-more-item abs-action-btn"
+                                        data-action="enable"
+                                        data-id="<?php echo htmlspecialchars($pid); ?>"
+                                        data-dir="<?php echo htmlspecialchars($pdir); ?>"
+                                        data-name="<?php echo htmlspecialchars($pname); ?>">
+                                    <span class="abs-icon">play_circle_outline</span>启用
+                                </button>
+                                <?php endif; ?>
+                            <?php endif; ?>
+                            <button type="button" class="abs-more-item abs-action-btn"
+                                    data-action="block"
+                                    data-id="<?php echo htmlspecialchars($pid); ?>"
+                                    data-dir="<?php echo htmlspecialchars($pdir); ?>"
+                                    data-name="<?php echo htmlspecialchars($pname); ?>"
+                                    data-version="<?php echo htmlspecialchars($pver); ?>"
+                                    data-blocked-all="<?php echo $blockedAll ? '1' : '0'; ?>"
+                                    data-blocked-version="<?php echo $blockedVer ? '1' : '0'; ?>">
+                                <span class="abs-icon">block</span>屏蔽更新
+                            </button>
+                            <?php if (!$isActivated && !$isSelf): ?>
+                            <button type="button" class="abs-more-item abs-action-btn abs-btn-danger-text"
+                                    data-action="uninstall"
+                                    data-id="<?php echo htmlspecialchars($pid); ?>"
+                                    data-dir="<?php echo htmlspecialchars($pdir); ?>"
+                                    data-name="<?php echo htmlspecialchars($pname); ?>">
+                                <span class="abs-icon">delete_outline</span>卸载
+                            </button>
+                            <?php endif; ?>
+                        </div>
+                    </div>
                     <?php elseif ($isInstalled): ?>
                     <?php if ($isActivated): ?>
                     <?php if ($settingsUrl): ?>
@@ -519,7 +608,7 @@ JS;
                     <a href="<?php echo htmlspecialchars($pluginsUrl); ?>" class="abs-btn abs-btn-text" title="在 Typecho 插件管理页禁用或卸载">
                         <span class="abs-icon">open_in_new</span>管理
                     </a>
-                    <?php else: ?>
+                    <?php elseif (!$isBuiltin): ?>
                     <button class="abs-btn abs-btn-tonal abs-action-btn"
                             data-action="disable"
                             data-id="<?php echo htmlspecialchars($pid); ?>"
@@ -590,6 +679,51 @@ JS;
             </div>
         </div>
     </div>
+
+    <!-- AB Editor 内置编辑器提醒对话框 -->
+    <div id="abs-editor-dialog" class="abs-dialog-overlay" style="display:none" role="dialog" aria-modal="true">
+        <div class="abs-dialog">
+            <h3 class="abs-dialog-title"><span class="abs-icon">info</span>提示：可用 AB Editor 内置编辑器</h3>
+            <p class="abs-dialog-body">您可直接使用 <strong>AB Editor</strong>（AB Admin 内置的所见即所得 Markdown 编辑器），无需重复安装第三方编辑器。</p>
+            <div class="abs-dialog-footer">
+                <button class="abs-btn abs-btn-text" id="abs-editor-cancel">取消</button>
+                <button class="abs-btn abs-btn-tonal" id="abs-editor-goto">前往 AB Editor</button>
+                <button class="abs-btn abs-btn-filled" id="abs-editor-continue">仍要安装</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Links+ 付费升级提醒对话框 -->
+    <div id="abs-paid-dialog" class="abs-dialog-overlay" style="display:none" role="dialog" aria-modal="true">
+        <div class="abs-dialog">
+            <h3 class="abs-dialog-title"><span class="abs-icon">lock</span>Links+ 新版本为付费插件</h3>
+            <p class="abs-dialog-body">
+                该插件的新版本（<span id="abs-paid-ver"></span>）为<strong>付费插件</strong>，购买后可获得升级授权。<br>
+                优惠码：<strong class="abs-coupon">Links</strong><br>
+                <a href="https://blog.lhl.one/artical/902.html" target="_blank" rel="noopener">查看详情</a>
+                &nbsp;·&nbsp;
+                <a href="https://shop.lhl.one/store/typecho-plugins" target="_blank" rel="noopener">购买链接</a>
+            </p>
+            <div class="abs-dialog-footer">
+                <button class="abs-btn abs-btn-text" id="abs-paid-cancel">取消</button>
+                <button class="abs-btn abs-btn-text" id="abs-paid-continue">仍要升级</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 屏蔽更新对话框 -->
+    <div id="abs-block-dialog" class="abs-dialog-overlay" style="display:none" role="dialog" aria-modal="true">
+        <div class="abs-dialog">
+            <h3 class="abs-dialog-title"><span class="abs-icon">block</span>屏蔽更新</h3>
+            <p class="abs-dialog-body">选择屏蔽方式：<strong id="abs-block-name"></strong><br>当前新版本：<span id="abs-block-ver"></span></p>
+            <div class="abs-dialog-footer abs-dialog-column">
+                <button class="abs-btn abs-btn-text abs-block-opt" id="abs-block-version">屏蔽本次更新</button>
+                <button class="abs-btn abs-btn-text abs-block-opt" id="abs-block-all">屏蔽本插件全部更新</button>
+                <button class="abs-btn abs-btn-text abs-btn-danger-text abs-block-opt" id="abs-block-unblock" style="display:none">解除屏蔽</button>
+                <button class="abs-btn abs-btn-tonal" id="abs-block-cancel">取消</button>
+            </div>
+        </div>
+    </div>
 </div>
 
 <script>
@@ -604,7 +738,7 @@ JS;
     var progressTimer = null;
 
     // ── 将 overlay 移到 body，避免祖先 transform 破坏 position:fixed 定位 ──
-    ['abs-progress', 'abs-uninstall-dialog'].forEach(function(id){
+    ['abs-progress', 'abs-uninstall-dialog', 'abs-editor-dialog', 'abs-paid-dialog', 'abs-block-dialog'].forEach(function(id){
         var el = document.getElementById(id);
         if (el && el.parentNode !== document.body) document.body.appendChild(el);
     });
@@ -963,8 +1097,47 @@ JS;
 
     // ── 操作按钮 ──
     var pendingUninstall = null;
+    var pendingInstall = null;
+    var pendingUpgrade = null;
+    var pendingBlock = null;
 
-    document.getElementById('abs-grid').addEventListener('click', function(e){
+    function doUpgrade(id, dir, repo, branch, subdir, downloadUrl, name){
+        runInstallOrUpgrade('upgrade', {id:id, dir:dir, repo:repo, branch:branch, subdir:subdir, downloadUrl:downloadUrl}, name, function(res){
+            if(res.code === 0){
+                finishProgressThen(function(){
+                    if(res.data && res.data.usedMode === 'server-fallback'){
+                        console.warn('[AB-Store] 浏览器上传未命中，已回退服务器下载（升级）:', name);
+                    }
+                    absToast('升级成功：' + name, 'success');
+                    setTimeout(function(){ absNavigate(location.href); }, 350);
+                }, '升级完成');
+            } else {
+                hideProgress();
+                absToast('升级失败：' + (res.message || '未知错误'), 'error');
+            }
+        });
+    }
+
+    function doInstall(id, dir, repo, branch, subdir, downloadUrl, downloadKey, name){
+        runInstallOrUpgrade('install', {id:id, dir:dir, repo:repo, branch:branch, subdir:subdir, downloadUrl:downloadUrl}, name, function(res){
+            if(res.code === 0){
+                bumpDownloadCount(downloadKey);
+                recordDownloadCount(downloadKey, {id:id, dir:dir, name:name, repo:repo});
+                finishProgressThen(function(){
+                    if(res.data && res.data.usedMode === 'server-fallback'){
+                        console.warn('[AB-Store] 浏览器上传未命中，已回退服务器下载（安装）:', name);
+                    }
+                    absToast('安装成功：' + name, 'success');
+                    setTimeout(function(){ absNavigate(location.href); }, 350);
+                }, '安装完成');
+            } else {
+                hideProgress();
+                absToast('安装失败：' + (res.message || '未知错误'), 'error');
+            }
+        });
+    }
+
+    document.addEventListener('click', function(e){
         var btn = e.target.closest('.abs-action-btn');
         if(!btn) return;
         var action  = btn.dataset.action;
@@ -976,42 +1149,47 @@ JS;
         var downloadUrl = btn.dataset.downloadurl || '';
         var cardEl  = btn.closest('.abs-card');
         var downloadKey = btn.dataset.dlkey || (cardEl ? (cardEl.dataset.downloadKey || '') : '');
-        var name    = cardEl && cardEl.querySelector('.abs-card-name')
+        var name    = btn.dataset.name || (cardEl && cardEl.querySelector('.abs-card-name')
                       ? cardEl.querySelector('.abs-card-name').textContent
-                      : (dir || id || '');
+                      : (dir || id || ''));
 
         if(action === 'install'){
-            runInstallOrUpgrade('install', {id:id, dir:dir, repo:repo, branch:branch, subdir:subdir, downloadUrl:downloadUrl}, name, function(res){
-                if(res.code === 0){
-                    bumpDownloadCount(downloadKey);
-                    recordDownloadCount(downloadKey, {id:id, dir:dir, name:name, repo:repo});
-                    finishProgressThen(function(){
-                        if(res.data && res.data.usedMode === 'server-fallback'){
-                            console.warn('[AB-Store] 浏览器上传未命中，已回退服务器下载（安装）:', name);
-                        }
-                        absToast('安装成功：' + name, 'success');
-                        setTimeout(function(){ absNavigate(location.href); }, 350);
-                    }, '安装完成');
-                } else {
-                    hideProgress();
-                    absToast('安装失败：' + (res.message || '未知错误'), 'error');
-                }
-            });
+            var editorTag = cardEl && cardEl.dataset.editorTag === '1';
+            if(editorTag){
+                // 该插件带"编辑器"标签：先提醒用户可用 AB Editor 内置编辑器
+                pendingInstall = {id:id, dir:dir, repo:repo, branch:branch, subdir:subdir, downloadUrl:downloadUrl, downloadKey:downloadKey, name:name};
+                var eDlg = document.getElementById('abs-editor-dialog');
+                eDlg.style.display = 'flex';
+                requestAnimationFrame(function(){ eDlg.classList.add('abs-dialog-open'); });
+            } else {
+                doInstall(id, dir, repo, branch, subdir, downloadUrl, downloadKey, name);
+            }
         } else if(action === 'upgrade'){
-            runInstallOrUpgrade('upgrade', {id:id, dir:dir, repo:repo, branch:branch, subdir:subdir, downloadUrl:downloadUrl}, name, function(res){
-                if(res.code === 0){
-                    finishProgressThen(function(){
-                        if(res.data && res.data.usedMode === 'server-fallback'){
-                            console.warn('[AB-Store] 浏览器上传未命中，已回退服务器下载（升级）:', name);
-                        }
-                        absToast('升级成功：' + name, 'success');
-                        setTimeout(function(){ absNavigate(location.href); }, 350);
-                    }, '升级完成');
-                } else {
-                    hideProgress();
-                    absToast('升级失败：' + (res.message || '未知错误'), 'error');
-                }
-            });
+            var paidUpgrade = cardEl && cardEl.dataset.paidUpgrade === '1';
+            if(paidUpgrade){
+                // Links+ 付费升级：先弹窗提示
+                pendingUpgrade = {id:id, dir:dir, repo:repo, branch:branch, subdir:subdir, downloadUrl:downloadUrl, name:name, version:btn.dataset.version || ''};
+                var pVer = document.getElementById('abs-paid-ver');
+                if(pVer) pVer.textContent = btn.dataset.version || '';
+                var pDlg = document.getElementById('abs-paid-dialog');
+                pDlg.style.display = 'flex';
+                requestAnimationFrame(function(){ pDlg.classList.add('abs-dialog-open'); });
+            } else {
+                doUpgrade(id, dir, repo, branch, subdir, downloadUrl, name);
+            }
+        } else if(action === 'block'){
+            pendingBlock = {dir:dir, version:btn.dataset.version || '', name:name};
+            var bName = document.getElementById('abs-block-name');
+            var bVer = document.getElementById('abs-block-ver');
+            if(bName) bName.textContent = name;
+            if(bVer) bVer.textContent = btn.dataset.version || '';
+            var unblockBtn = document.getElementById('abs-block-unblock');
+            if(unblockBtn){
+                unblockBtn.style.display = (btn.dataset.blockedAll === '1' || btn.dataset.blockedVersion === '1') ? '' : 'none';
+            }
+            var bDlg = document.getElementById('abs-block-dialog');
+            bDlg.style.display = 'flex';
+            requestAnimationFrame(function(){ bDlg.classList.add('abs-dialog-open'); });
         } else if(action === 'enable'){
             startSoftProgress('正在启用 ' + name + '…', '正在更新插件状态…');
             absPost('togglePlugin', {dir:dir, enable:'1'}, function(res){
@@ -1047,6 +1225,61 @@ JS;
             dlg.style.display = 'flex';
             requestAnimationFrame(function(){ dlg.classList.add('abs-dialog-open'); });
         }
+    });
+
+    // 其他操作下拉菜单（body 浮层，避开卡片 overflow 裁剪与 z-index 遮挡）
+    var absMoreOpenBtn = null;
+    var absMoreOpenMenu = null;
+    function closeMoreMenus(){
+        absMoreOpenBtn = null;
+        absMoreOpenMenu = null;
+        document.querySelectorAll('.abs-more-menu.abs-more-open').forEach(function(m){
+            m.classList.remove('abs-more-open');
+        });
+    }
+    function positionMoreMenu(btn, menu){
+        var rect = btn.getBoundingClientRect();
+        menu.style.top = (rect.bottom + 4) + 'px';
+        var mw = menu.offsetWidth || 150;
+        var left = rect.right - mw;
+        if(left < 8) left = 8;
+        menu.style.left = left + 'px';
+        var maxH = window.innerHeight - rect.bottom - 8;
+        if(maxH < 120) maxH = 120;
+        menu.style.maxHeight = maxH + 'px';
+        menu.style.overflowY = 'auto';
+    }
+    function openMoreMenu(btn, menu){
+        // 记录菜单引用（菜单首次打开后会移到 body，不能再通过卡片内查询）
+        btn._absMenu = menu;
+        // 移到 body，逃出卡片 overflow:hidden 的裁剪
+        if(menu.parentNode !== document.body) document.body.appendChild(menu);
+        absMoreOpenBtn = btn;
+        absMoreOpenMenu = menu;
+        positionMoreMenu(btn, menu);
+        menu.classList.add('abs-more-open');
+    }
+    // 滚动/缩放时让固定定位的下拉跟随按钮，避免停留在原处
+    function repositionMoreMenu(){
+        if(absMoreOpenBtn && absMoreOpenMenu && absMoreOpenMenu.classList.contains('abs-more-open')){
+            positionMoreMenu(absMoreOpenBtn, absMoreOpenMenu);
+        }
+    }
+    document.addEventListener('scroll', repositionMoreMenu, true);
+    window.addEventListener('resize', repositionMoreMenu);
+    // 菜单浮层在 body 中，需在 document 层级监听切换/关闭
+    document.addEventListener('click', function(e){
+        var moreBtn = e.target.closest('[data-more-btn]');
+        if(moreBtn){
+            e.preventDefault();
+            var menu = moreBtn._absMenu || moreBtn.closest('.abs-more-wrap').querySelector('.abs-more-menu');
+            var isOpen = menu.classList.contains('abs-more-open');
+            closeMoreMenus();
+            if(!isOpen) openMoreMenu(moreBtn, menu);
+            return;
+        }
+        // 点击任何其他位置（含菜单项、卡片按钮、外部）都关闭下拉
+        closeMoreMenus();
     });
 
     // 卸载对话框按钮
@@ -1104,6 +1337,98 @@ JS;
     // 点击遮罩关闭对话框
     document.getElementById('abs-uninstall-dialog').addEventListener('click', function(e){
         if(e.target === this) closeUninstallDialog();
+    });
+
+    // ===== AB Editor 提醒对话框 =====
+    function closeEditorDialog(){
+        var dlg = document.getElementById('abs-editor-dialog');
+        dlg.classList.remove('abs-dialog-open');
+        setTimeout(function(){ dlg.style.display = 'none'; }, 250);
+    }
+    document.getElementById('abs-editor-cancel').addEventListener('click', closeEditorDialog);
+
+    // 前往 AB Editor：滚动到其卡片并高亮提示
+    document.getElementById('abs-editor-goto').addEventListener('click', function(){
+        closeEditorDialog();
+        var abCard = document.querySelector('.abs-card[data-id="ABEditor"]');
+        if(abCard){
+            abCard.style.display = '';
+            abCard.scrollIntoView({behavior:'smooth', block:'center'});
+            abCard.classList.add('abs-card-flash');
+            setTimeout(function(){ abCard.classList.remove('abs-card-flash'); }, 1800);
+        }
+    });
+
+    // 仍要安装：继续执行安装
+    document.getElementById('abs-editor-continue').addEventListener('click', function(){
+        if(!pendingInstall) return;
+        var p = pendingInstall;
+        pendingInstall = null;
+        closeEditorDialog();
+        doInstall(p.id, p.dir, p.repo, p.branch, p.subdir, p.downloadUrl, p.downloadKey, p.name);
+    });
+
+    // 点击遮罩关闭对话框
+    document.getElementById('abs-editor-dialog').addEventListener('click', function(e){
+        if(e.target === this) closeEditorDialog();
+    });
+
+    // ===== Links+ 付费升级提醒对话框 =====
+    function closePaidDialog(){
+        var dlg = document.getElementById('abs-paid-dialog');
+        dlg.classList.remove('abs-dialog-open');
+        setTimeout(function(){ dlg.style.display = 'none'; }, 250);
+    }
+    document.getElementById('abs-paid-cancel').addEventListener('click', closePaidDialog);
+    document.getElementById('abs-paid-continue').addEventListener('click', function(){
+        if(!pendingUpgrade) return;
+        var p = pendingUpgrade;
+        pendingUpgrade = null;
+        closePaidDialog();
+        doUpgrade(p.id, p.dir, p.repo, p.branch, p.subdir, p.downloadUrl, p.name);
+    });
+    document.getElementById('abs-paid-dialog').addEventListener('click', function(e){
+        if(e.target === this) closePaidDialog();
+    });
+
+    // ===== 屏蔽更新对话框 =====
+    function closeBlockDialog(){
+        var dlg = document.getElementById('abs-block-dialog');
+        dlg.classList.remove('abs-dialog-open');
+        setTimeout(function(){ dlg.style.display = 'none'; }, 250);
+    }
+    document.getElementById('abs-block-cancel').addEventListener('click', closeBlockDialog);
+
+    function runBlock(mode){
+        if(!pendingBlock) return;
+        var p = pendingBlock;
+        startSoftProgress('正在屏蔽更新…', '正在更新屏蔽设置…');
+        absPost('blockUpdate', {dir:p.dir, version:p.version, mode:mode}, function(res){
+            if(res.code === 0){
+                finishProgressThen(function(){
+                    absToast(res.message || '已屏蔽更新', 'success');
+                    setTimeout(function(){ absNavigate(location.href); }, 350);
+                }, '已保存');
+            } else {
+                hideProgress();
+                absToast('操作失败：' + (res.message || '未知错误'), 'error');
+            }
+        });
+    }
+    document.getElementById('abs-block-version').addEventListener('click', function(){
+        closeBlockDialog();
+        runBlock('version');
+    });
+    document.getElementById('abs-block-all').addEventListener('click', function(){
+        closeBlockDialog();
+        runBlock('all');
+    });
+    document.getElementById('abs-block-unblock').addEventListener('click', function(){
+        closeBlockDialog();
+        runBlock('clear');
+    });
+    document.getElementById('abs-block-dialog').addEventListener('click', function(e){
+        if(e.target === this) closeBlockDialog();
     });
 })();
 </script>
@@ -1226,6 +1551,35 @@ JS;
         return $map;
     }
 
+    /** 屏蔽更新配置文件路径 */
+    public static function updateBlockFile()
+    {
+        return self::pluginDir() . 'update-block.json';
+    }
+
+    /**
+     * 读取屏蔽更新配置
+     * @return array 结构：['all' => [dir => true], 'versions' => [dir => [ver => true]]]
+     */
+    public static function getUpdateBlock()
+    {
+        $file = self::updateBlockFile();
+        if (file_exists($file)) {
+            $d = @json_decode(@file_get_contents($file), true);
+            if (is_array($d)) {
+                if (!isset($d['all']))    $d['all'] = array();
+                if (!isset($d['versions'])) $d['versions'] = array();
+                return $d;
+            }
+        }
+        return array('versions' => array(), 'all' => array());
+    }
+
+    public static function setUpdateBlock($data)
+    {
+        @file_put_contents(self::updateBlockFile(), json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+    }
+
     // ================================================================
     //  内联 CSS（MD3 风格，全部使用 AdminBeautify 的 var(--md-*) 变量）
     // ================================================================
@@ -1245,6 +1599,7 @@ JS;
 .abs-badge-featured{background:linear-gradient(135deg,#FFD54F,#FFB300);color:#4E342E;display:inline-flex;align-items:center;gap:3px;box-shadow:0 2px 4px rgba(255,179,0,0.2)}
 .abs-badge-active{background:var(--md-tertiary-container,#c4eed0);color:var(--md-on-tertiary-container,#002114);display:inline-flex;align-items:center;gap:3px}
 .abs-badge-disabled{background:var(--md-surface-container,#ece6f0);color:var(--md-on-surface-variant,#49454f)}
+.abs-badge-blocked{background:var(--md-error-container,#f9dedc);color:var(--md-on-error-container,#410e0b);display:inline-flex;align-items:center;gap:3px}
 .abs-filter-bar{display:flex;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:20px}
 .abs-search-wrap{position:relative;flex:1;min-width:200px;max-width:340px}
 .abs-search-icon{position:absolute;left:10px;top:50%;transform:translateY(-50%);font-size:1.1rem;color:var(--md-on-surface-variant,#49454f);pointer-events:none;z-index:1}
@@ -1266,6 +1621,8 @@ JS;
 .abs-card-featured::before{content:'';position:absolute;left:0;top:0;width:100%;height:3px;background:linear-gradient(90deg,#FFD54F,#FFB300);opacity:.95}
 .abs-card-active{border-color:color-mix(in srgb,var(--md-tertiary-container,#c4eed0) 80%,var(--md-tertiary,#006e42));background:color-mix(in srgb,var(--md-tertiary-container,#c4eed0) 28%,var(--md-surface-container-low,#f7f2fa))}
 .abs-card-disabled{border-color:var(--md-outline-variant,#cac4d0);background:var(--md-surface-container-lowest,#fffbfe);opacity:.75}
+.abs-card-flash{animation:abs-card-flash 1.6s ease}
+@keyframes abs-card-flash{0%,100%{box-shadow:none}20%,60%{box-shadow:0 0 0 3px var(--md-primary,#6750a4)}}
 .abs-avatar-disabled{background:var(--md-surface-container-highest,#e6e0e9)!important;color:var(--md-on-surface-variant,#49454f)!important}
 .abs-card-header{display:flex;align-items:center;gap:12px}
 .abs-card-avatar{width:46px;height:46px;flex-shrink:0;background:var(--md-primary-container,#eaddff);color:var(--md-on-primary-container,#21005d);border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:1.3rem;font-weight:700;line-height:1;letter-spacing:-.02em}
@@ -1290,6 +1647,16 @@ JS;
 .abs-card-repo{display:inline-flex;align-items:center;color:var(--md-on-surface-variant,#49454f);text-decoration:none;opacity:.6;transition:opacity .15s}
 .abs-card-repo:hover{opacity:1}
 .abs-card-actions{display:flex;gap:4px;flex-wrap:nowrap;align-items:center;flex-shrink:0}
+/* 其他操作下拉菜单（body 浮层，避开卡片 overflow 裁剪与 z-index 遮挡） */
+.abs-more-wrap{position:relative}
+.abs-more-btn{white-space:nowrap}
+.abs-more-menu{position:fixed;top:0;left:0;z-index:1000;min-width:150px;background:var(--md-surface-container-low,#f7f2fa);border:1px solid var(--md-outline-variant,#cac4d0);border-radius:12px;padding:6px;box-shadow:0 8px 24px rgba(0,0,0,.18);display:none;flex-direction:column;gap:2px}
+.abs-more-menu.abs-more-open{display:flex}
+.abs-more-item{display:flex;align-items:center;gap:8px;width:100%;padding:8px 12px;border:none;background:transparent;color:var(--md-on-surface-variant,#49454f);font-size:.82rem;font-weight:500;text-align:left;cursor:pointer;border-radius:8px;text-decoration:none;box-sizing:border-box;white-space:nowrap}
+.abs-more-item .abs-icon{font-size:1.05rem}
+.abs-more-item:hover{background:var(--md-surface-container,#ece6f0);color:var(--md-on-surface,#1c1b1f)}
+a.abs-more-item{color:var(--md-primary,#6750a4)}
+a.abs-more-item:hover{color:var(--md-primary,#6750a4)}
 .abs-btn{display:inline-flex;align-items:center;gap:4px;padding:6px 12px;border-radius:20px;font-size:.82rem;font-weight:500;cursor:pointer;border:none;transition:background .15s,box-shadow .15s,opacity .15s;white-space:nowrap}
 .abs-btn:disabled{opacity:.5;cursor:not-allowed}
 .abs-btn .abs-icon{font-size:1rem}
@@ -1299,6 +1666,8 @@ JS;
 .abs-btn-danger:hover:not(:disabled){background:color-mix(in srgb,var(--md-error,#b3261e) 85%,#000)!important}
 .abs-btn-tonal{background:var(--md-secondary-container,#e8def8);color:var(--md-on-secondary-container,#1d192b)}
 .abs-btn-tonal:hover:not(:disabled){background:color-mix(in srgb,var(--md-secondary-container,#e8def8) 80%,#000)}
+a.abs-btn{text-decoration:none}
+a.abs-btn-text,a.abs-btn-text:hover,a.abs-btn-text:visited{color:var(--md-primary,#6750a4)}
 .abs-sort-sel{padding:5px 28px 5px 10px;border:1px solid var(--md-outline-variant,#cac4d0);border-radius:20px;background:var(--md-surface-container-low,#f7f2fa) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%2349454f' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E") no-repeat right 10px center;color:var(--md-on-surface,#1c1b1f);font-size:.82rem;font-weight:500;cursor:pointer;outline:none;-webkit-appearance:none;appearance:none;transition:border-color .15s;height:auto;line-height:1.5}
 .abs-sort-sel:focus{border-color:var(--md-primary,#6750a4);box-shadow:0 0 0 2px color-mix(in srgb,var(--md-primary,#6750a4) 18%,transparent)}
 .abs-btn-text{background:transparent;color:var(--md-primary,#6750a4);padding:6px 8px}
@@ -1330,7 +1699,10 @@ JS;
 .abs-dialog-title .abs-icon{color:var(--md-error,#b3261e)}
 .abs-dialog-body{margin:0;font-size:.9rem;color:var(--md-on-surface-variant,#49454f);line-height:1.55}
 .abs-dialog-body strong{color:var(--md-on-surface,#1c1b1f)}
+.abs-coupon{display:inline-block;padding:2px 10px;border:1px dashed var(--md-primary,#6750a4);border-radius:6px;color:var(--md-primary,#6750a4);background:color-mix(in srgb,var(--md-primary,#6750a4) 8%,transparent);font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;letter-spacing:.02em}
 .abs-dialog-footer{display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap}
+.abs-dialog-column{flex-direction:column;align-items:stretch}
+.abs-dialog-column .abs-btn{justify-content:center}
 .abs-toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);z-index:11000;padding:12px 24px;border-radius:8px;font-size:.9rem;font-weight:500;opacity:0;transition:opacity .25s,transform .25s;pointer-events:none;white-space:nowrap;max-width:90vw;text-overflow:ellipsis;overflow:hidden;box-shadow:0 4px 16px rgba(0,0,0,.18)}
 .abs-toast-show{opacity:1;transform:translateX(-50%) translateY(0)}
 .abs-toast-success{background:var(--md-primary-container,#eaddff);color:var(--md-on-primary-container,#21005d);border-left:4px solid var(--md-primary,#6750a4)}
