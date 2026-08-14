@@ -1,6 +1,6 @@
 {
   "schema": "1.0",
-  "updated": "2026-07-27T04:55:00Z",
+  "updated": "2026-08-14T14:19:00Z",
   "plugins": [
     {
       "id": "AB-Store",
@@ -360,12 +360,12 @@
       "description": "一个文章付费与订阅插件，支持单篇付费和订阅计划，内置多种支付通道和可定制主题，通过自定义字段灵活控制付费属性",
       "author": "LHL",
       "authorUrl": "https://blog.lhl.one",
-      "version": "1.0.4",
+      "version": "1.0.5",
       "repo": "lhl77/TypechoPaid",
       "directory": "TypechoPaid",
       "subDirectory": "TypechoPaid",
       "branch": "main",
-      "downloadUrl": "https://github.com/lhl77/TypechoPaid/releases/download/v1.0.4/TypechoPaid.zip",
+      "downloadUrl": "https://github.com/lhl77/TypechoPaid/releases/download/v1.0.5/TypechoPaid.zip",
       "homepage": "https://blog.lhl.one/artical/1309.html",
       "tags": ["文章付费","推荐"],
       "changelog": "https://github.com/lhl77/TypechoPaid/releases"
