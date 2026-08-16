@@ -5,7 +5,7 @@
  *
  * @package   AB-Store
  * @author    LHL
- * @version   1.0.21
+ * @version   1.0.22
  * @link      https://github.com/lhl77/Typecho-Plugin-AdminBeautifyStore
  */
 
@@ -15,8 +15,11 @@ if (!defined('__TYPECHO_ROOT_DIR__')) {
 
 class AdminBeautifyStore_Plugin implements Typecho_Plugin_Interface
 {
-    /** 仓库 JSON 文件的 raw URL */
-    const REMOTE_JSON_URL = 'https://raw.githubusercontent.com/lhl77/Typecho-Plugin-AdminBeautifyStore/main/plugins.json';
+    /** AB Store 插件列表 API 地址 */
+    const REMOTE_JSON_URL = 'https://ab-store.lhl.one/api/plugins';
+
+    /** AB Store 站点地址 */
+    const STORE_BASE_URL = 'https://ab-store.lhl.one';
 
     /** 本地缓存文件 */
     const CACHE_FILE = 'cache.json';
@@ -172,7 +175,7 @@ class AdminBeautifyStore_Plugin implements Typecho_Plugin_Interface
             'ajaxUrl'       => $ajaxUrl,
             'token'         => $token,
             'pluginUrl'     => Typecho_Common::url('AdminBeautifyStore/', $options->pluginUrl),
-            'downloadApiBase' => 'https://gh1.lhl.one',
+            'downloadApiBase' => 'https://ab-store.lhl.one',
             'installedMap'  => $installedMap,
             'activatedMap'  => self::buildActivatedMap(),
             'storeUrl'      => $options->adminUrl . 'extending.php?panel=' . urlencode('AdminBeautifyStore/Panel.php'),
@@ -304,7 +307,10 @@ JS;
             <?php if ($cacheAge): ?>
             <span class="abs-stat abs-stat-muted"><?php echo htmlspecialchars($cacheAge); ?></span>
             <?php endif; ?>
-            <a href="https://github.com/lhl77/Typecho-Plugin-AdminBeautifyStore" target="_blank" rel="noopener" class="abs-btn abs-btn-text" title="向 AB插件仓库 提交插件">
+            <button type="button" class="abs-btn abs-btn-text" id="abs-token-btn" title="通过分享口令安装插件">
+                <span class="abs-icon">key</span>口令安装
+            </button>
+            <a href="https://ab-store.lhl.one" target="_blank" rel="noopener" class="abs-btn abs-btn-text" title="向 AB Store 提交插件">
                 <span class="abs-icon">add_circle_outline</span>投稿
             </a>
             <a href="<?php echo htmlspecialchars($pluginsUrl); ?>" class="abs-btn abs-btn-text" title="前往 Typecho 插件管理页">
@@ -315,7 +321,7 @@ JS;
                 <option value="alpha-desc">名称 Z→A</option>
                 <option value="default">默认顺序</option>
             </select>
-            <button class="abs-btn abs-btn-tonal" id="abs-refresh-btn" title="从 GitHub 重新拉取插件列表">
+            <button class="abs-btn abs-btn-tonal" id="abs-refresh-btn" title="从 AB Store 重新拉取插件列表">
                 <span class="abs-icon">refresh</span>刷新列表
             </button>
         </div>
@@ -345,7 +351,7 @@ JS;
         <?php if (empty($plugins)): ?>
         <div class="abs-empty">
             <span class="abs-icon abs-icon-lg">inventory_2</span>
-            <p>暂无插件数据，请点击「刷新列表」从 GitHub 拉取</p>
+            <p>暂无插件数据，请点击「刷新列表」从 AB Store 拉取</p>
         </div>
         <?php else: ?>
         <?php $pIdx = 0; foreach ($plugins as $p): $pIdx++;
@@ -363,6 +369,7 @@ JS;
             $ptags    = isset($p['tags'])         ? (array)$p['tags'] : array();
             $pbranch  = isset($p['branch'])       ? $p['branch']      : 'main';
             $downloadKey = $pid ? $pid : $pdir;
+            $pDownloads = isset($p['downloads'])    ? intval($p['downloads']) : 0;
 
             $displayTags = array();
             $isFeatured  = false;
@@ -465,9 +472,9 @@ JS;
                             </span>
                             <?php if (!$isSelf && !$isBuiltin): ?>
                             <span style="opacity:0.4;font-size:0.75rem;flex-shrink:0">•</span>
-                            <span class="abs-download" data-download-key="<?php echo htmlspecialchars($downloadKey); ?>" data-count="" title="安装次数" style="flex-shrink:0">
+                            <span class="abs-download" data-download-key="<?php echo htmlspecialchars($downloadKey); ?>" data-count="<?php echo $pDownloads; ?>" title="安装次数" style="flex-shrink:0">
                                 <span class="abs-icon" style="font-size:0.95rem">download</span>
-                                <span class="abs-download-text"><span class="abs-download-skeleton" style="width:24px;height:10px;vertical-align:middle;display:inline-block"></span></span>
+                                <span class="abs-download-text"><?php echo $pDownloads; ?></span>
                             </span>
                             <?php endif; ?>
                         </div>
@@ -724,6 +731,23 @@ JS;
             </div>
         </div>
     </div>
+
+    <!-- 口令安装对话框 -->
+    <div id="abs-token-dialog" class="abs-dialog-overlay" style="display:none" role="dialog" aria-modal="true">
+        <div class="abs-dialog">
+            <h3 class="abs-dialog-title"><span class="abs-icon" style="color:var(--md-primary,#4682b4)">key</span>口令安装</h3>
+            <p class="abs-dialog-body">输入 AB Store 的插件口令：<br>
+                · <b>公开插件</b>：直接输入插件口令（插件 ID），如 <code>a1b2c3d4</code><br>
+                · <b>待审核 / 私密插件</b>：粘贴完整分享链接 <code>https://ab-store.lhl.one/plugin/&lt;id&gt;?token=&lt;token&gt;</code>
+            </p>
+            <input type="text" id="abs-token-input" class="abs-dialog-input" placeholder="插件口令（ID）或完整分享链接…" autocomplete="off" spellcheck="false">
+            <p class="abs-dialog-body" id="abs-token-error" style="display:none;color:var(--md-error,#b3261e)"></p>
+            <div class="abs-dialog-footer">
+                <button class="abs-btn abs-btn-text" id="abs-token-cancel">取消</button>
+                <button class="abs-btn abs-btn-filled" id="abs-token-submit">查询并添加</button>
+            </div>
+        </div>
+    </div>
 </div>
 
 <script>
@@ -732,13 +756,14 @@ JS;
     var rootEl = document.getElementById('abs-root');
     var ajaxUrl = rootEl.dataset.ajax;
     var token   = rootEl.dataset.token;
-    var downloadApiBase = String(CFG.downloadApiBase || 'https://gh1.lhl.one').replace(/\/+$/, '');
+    var downloadApiBase = String(CFG.downloadApiBase || 'https://ab-store.lhl.one').replace(/\/+$/, '');
+    var ghMirrorBase = 'https://gh1.lhl.one';
     // 优先使用当前页面实时注入的设置值，避免读取到旧的全局配置缓存。
     var downloadMode = String(rootEl.dataset.downloadMode || CFG.downloadMode || 'server') === 'browser' ? 'browser' : 'server';
     var progressTimer = null;
 
     // ── 将 overlay 移到 body，避免祖先 transform 破坏 position:fixed 定位 ──
-    ['abs-progress', 'abs-uninstall-dialog', 'abs-editor-dialog', 'abs-paid-dialog', 'abs-block-dialog'].forEach(function(id){
+    ['abs-progress', 'abs-uninstall-dialog', 'abs-editor-dialog', 'abs-paid-dialog', 'abs-block-dialog', 'abs-token-dialog'].forEach(function(id){
         var el = document.getElementById(id);
         if (el && el.parentNode !== document.body) document.body.appendChild(el);
     });
@@ -847,8 +872,10 @@ JS;
     function toMirrorUrl(url){
         var raw = String(url || '').trim();
         if(!raw) return '';
+        // AB Store 直链（/api/download/<id> 302 自动计数）不走 gh1 镜像，直接请求
         if(raw.indexOf(downloadApiBase + '/') === 0) return raw;
-        return downloadApiBase + '/' + raw.replace(/^\/+/, '');
+        if(raw.indexOf(ghMirrorBase + '/') === 0) return raw;
+        return ghMirrorBase + '/' + raw.replace(/^\/+/, '');
     }
 
     function resolveZipUrl(repo, branch, downloadUrl){
@@ -949,12 +976,6 @@ JS;
         }, 3500);
     }
 
-    function setDownloadLoading(el){
-        if(!el) return;
-        var text = el.querySelector('.abs-download-text');
-        if(text) text.innerHTML = '<span class="abs-download-skeleton"></span>';
-    }
-
     function setDownloadText(el, count){
         if(!el) return;
         var text = el.querySelector('.abs-download-text');
@@ -978,46 +999,12 @@ JS;
         });
     }
 
-    function loadDownloadCounts(){
-        var nodes = Array.prototype.slice.call(document.querySelectorAll('.abs-download[data-download-key]'));
-        if(!nodes.length) return;
-        var keyMap = {};
-        nodes.forEach(function(node){
-            var key = (node.dataset.downloadKey || '').trim();
-            if(!key) return;
-            keyMap[key] = true;
-            setDownloadLoading(node);
-        });
-        var keys = Object.keys(keyMap);
-        if(!keys.length) return;
-
-        var url = downloadApiBase + '/api/downloads?ids=' + encodeURIComponent(keys.join(','));
-        fetch(url, {method:'GET'})
-            .then(function(r){ return r.json(); })
-            .then(function(res){
-                var map = (res && res.data) ? res.data : {};
-                nodes.forEach(function(node){
-                    var key = (node.dataset.downloadKey || '').trim();
-                    setDownloadText(node, map[key]);
-                });
-            })
-            .catch(function(){
-                nodes.forEach(function(node){ setDownloadText(node, null); });
-            });
-    }
-
-    function recordDownloadCount(key, meta){
-        if(!key) return;
-        fetch(downloadApiBase + '/api/downloads/record', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({key: key, delta: 1, meta: meta || {}})
-        }).catch(function(){});
-    }
+    // 下载次数由服务端渲染（AB Store API 返回的 downloads 字段），不再异步加载；
+    // /api/download/<id> 302 跳转时已自动计数，安装成功后也不再上报。
 
     // ── 刷新列表 ──
     document.getElementById('abs-refresh-btn').addEventListener('click', function(){
-        startSoftProgress('正在从 GitHub 拉取最新插件列表…', '服务器正在刷新索引…');
+        startSoftProgress('正在从 AB Store 拉取最新插件列表…', '服务器正在刷新索引…');
         absPost('refresh', {force: '1'}, function(res){
             if(res.code === 0){
                 finishProgressThen(function(){
@@ -1059,8 +1046,6 @@ JS;
         sortCards(v);
     });
 
-    loadDownloadCounts();
-
     // ── 搜索 ──
     var searchEl = document.getElementById('abs-search');
     searchEl.addEventListener('input', function(){
@@ -1091,6 +1076,7 @@ JS;
             if(activeFilter === 'disabled')     matchF = card.dataset.installed === '1' && card.dataset.activated !== '1';
             if(activeFilter === 'notinstalled') matchF = card.dataset.installed !== '1';
             if(activeFilter === 'update')       matchF = card.dataset.hasUpdate === '1';
+            if(activeFilter === 'token')        matchF = card.dataset.source === 'token';
             card.style.display = (matchQ && matchF) ? '' : 'none';
         });
     }
@@ -1122,7 +1108,6 @@ JS;
         runInstallOrUpgrade('install', {id:id, dir:dir, repo:repo, branch:branch, subdir:subdir, downloadUrl:downloadUrl}, name, function(res){
             if(res.code === 0){
                 bumpDownloadCount(downloadKey);
-                recordDownloadCount(downloadKey, {id:id, dir:dir, name:name, repo:repo});
                 finishProgressThen(function(){
                     if(res.data && res.data.usedMode === 'server-fallback'){
                         console.warn('[AB-Store] 浏览器上传未命中，已回退服务器下载（安装）:', name);
@@ -1430,6 +1415,258 @@ JS;
     document.getElementById('abs-block-dialog').addEventListener('click', function(e){
         if(e.target === this) closeBlockDialog();
     });
+
+    // ===== 口令安装对话框 =====
+    var TOKEN_STORE_KEY = 'abs-token-plugins';
+    var tokenDlg    = document.getElementById('abs-token-dialog');
+    var tokenInput  = document.getElementById('abs-token-input');
+    var tokenError  = document.getElementById('abs-token-error');
+    var tokenSubmit = document.getElementById('abs-token-submit');
+
+    function absEsc(s){
+        return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){
+            return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
+        });
+    }
+    function loadTokenPlugins(){
+        try {
+            var raw = sessionStorage.getItem(TOKEN_STORE_KEY);
+            var arr = raw ? JSON.parse(raw) : [];
+            return (arr && arr.constructor === Array) ? arr : [];
+        } catch(e){ return []; }
+    }
+    function saveTokenPlugins(list){
+        try { sessionStorage.setItem(TOKEN_STORE_KEY, JSON.stringify(list)); } catch(e){}
+    }
+    function extractRepoFromGithub(url){
+        var m = String(url || '').match(/github\.com\/([A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+)/);
+        if(!m) return '';
+        var repo = m[1].replace(/\/+$/, '');
+        if(repo.slice(-4) === '.git') repo = repo.slice(0, -4);
+        return repo;
+    }
+    function parseTokenInput(raw){
+        var s = String(raw || '').trim();
+        if(!s) return null;
+        // 完整分享链接：https://ab-store.lhl.one/plugin/<id>?token=<token>
+        var m = s.match(/ab-store\.lhl\.one\/plugin\/([A-Za-z0-9_-]+)/i);
+        if(m){
+            var tm = s.match(/[?&]token=([A-Za-z0-9_-]+)/);
+            return {id: m[1], token: tm ? tm[1] : ''};
+        }
+        // <id>?token=<token>
+        m = s.match(/^([A-Za-z0-9_-]+)\?token=([A-Za-z0-9_-]+)$/);
+        if(m) return {id: m[1], token: m[2]};
+        // <id> <token>（空格 / 冒号 / 加号分隔）
+        var parts = s.split(/[\s:+]+/).filter(function(x){ return x; });
+        if(parts.length >= 2) return {id: parts[0], token: parts[1]};
+        // 仅插件 ID（公开插件可直接定位）
+        if(/^[A-Za-z0-9_-]+$/.test(s)) return {id: s, token: ''};
+        return null;
+    }
+    function buildTokenCard(p){
+        var pid     = String(p.id || '');
+        var pname   = String(p.name || pid);
+        var pdir    = String(p.dir || '');
+        var pdesc   = String(p.desc || '');
+        var pauthor = String(p.author || '');
+        var pver    = String(p.version || '');
+        var phome   = String(p.homepage || '');
+        var ptags   = (p.tags && p.tags.constructor === Array) ? p.tags : [];
+        var downloads = isFinite(Number(p.downloads)) ? Number(p.downloads) : 0;
+        var status  = String(p.status || 'approved');
+        var repo    = extractRepoFromGithub(p.github || '');
+        // 口令插件统一走 /api/download/<id>?token=…（302 直链自动计数，兼容私密/审核中）
+        var downloadUrl = downloadApiBase + '/api/download/' + encodeURIComponent(pid) +
+            (p.token ? '?token=' + encodeURIComponent(p.token) : '');
+        var isDown  = (status === 'archived' || status === 'rejected');
+
+        var displayTags = [];
+        var hasEditorTag = false;
+        ptags.forEach(function(t){
+            t = String(t).trim();
+            if(!t) return;
+            if(t.indexOf('编辑器') !== -1) hasEditorTag = true;
+            if(t === '强调' || t.indexOf('推荐') !== -1) return;
+            displayTags.push(t);
+        });
+
+        var badge = '';
+        if(status === 'pending'){
+            badge = '<span class="abs-badge abs-badge-pending" title="该插件正在审核中">审核中</span>';
+        } else if(isDown){
+            badge = '<span class="abs-badge abs-badge-archived" title="该插件已下架">已下架</span>';
+        }
+
+        var tagsHtml = '';
+        if(displayTags.length){
+            tagsHtml = '<div class="abs-card-tags">' + displayTags.map(function(t){
+                return '<span class="abs-tag">' + absEsc(t) + '</span>';
+            }).join('') + '</div>';
+        }
+
+        var verLinks = '';
+        if(pver) verLinks += '<span>' + absEsc(pver) + '</span>';
+        if(repo) verLinks += '<a href="https://github.com/' + absEsc(repo) + '" target="_blank" rel="noopener" class="abs-card-repo" title="GitHub 仓库"><span class="abs-icon abs-icon-sm">code</span></a>';
+        if(phome) verLinks += '<a href="' + absEsc(phome) + '" target="_blank" rel="noopener" class="abs-card-repo" title="插件主页"><span class="abs-icon abs-icon-sm">open_in_new</span></a>';
+
+        var actionHtml;
+        if(isDown){
+            actionHtml = '<button class="abs-btn abs-btn-filled" disabled title="该插件已下架"><span class="abs-icon">block</span>已下架</button>';
+        } else {
+            actionHtml = '<button class="abs-btn abs-btn-filled abs-action-btn"'
+                + ' data-action="install"'
+                + ' data-id="' + absEsc(pid) + '"'
+                + ' data-dir="' + absEsc(pdir) + '"'
+                + ' data-dlkey="' + absEsc(pid) + '"'
+                + ' data-repo="' + absEsc(repo) + '"'
+                + ' data-branch="main"'
+                + ' data-subdir=""'
+                + ' data-downloadurl="' + absEsc(downloadUrl) + '">'
+                + '<span class="abs-icon">download</span>安装</button>';
+        }
+
+        var card = document.createElement('div');
+        card.className = 'abs-card abs-card-token';
+        card.dataset.index = '9999';
+        card.dataset.id = pid;
+        card.dataset.dir = pdir;
+        card.dataset.downloadKey = pid;
+        card.dataset.installed = '0';
+        card.dataset.activated = '0';
+        card.dataset.hasUpdate = '0';
+        card.dataset.filterTags = displayTags.join(' ');
+        card.dataset.editorTag = hasEditorTag ? '1' : '0';
+        card.dataset.paidUpgrade = '0';
+        card.dataset.blockedAll = '0';
+        card.dataset.blockedVersion = '0';
+        card.dataset.source = 'token';
+        card.innerHTML =
+            '<div class="abs-card-header">'
+            + '<div class="abs-card-avatar">' + absEsc(pname.slice(0, 1) || '?') + '</div>'
+            + '<div class="abs-card-meta">'
+            + '<div class="abs-card-name">' + absEsc(pname) + '</div>'
+            + '<div class="abs-card-author"><div style="display:flex;align-items:center;gap:6px;width:100%">'
+            + '<span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:70%">' + absEsc(pauthor || '匿名') + '</span>'
+            + '<span style="opacity:0.4;font-size:0.75rem;flex-shrink:0">•</span>'
+            + '<span class="abs-download" data-download-key="' + absEsc(pid) + '" data-count="' + downloads + '" title="安装次数" style="flex-shrink:0">'
+            + '<span class="abs-icon" style="font-size:0.95rem">download</span>'
+            + '<span class="abs-download-text">' + downloads + '</span>'
+            + '</span>'
+            + '</div></div>'
+            + '</div>'
+            + '<div class="abs-card-badge-wrap">' + badge + '</div>'
+            + '</div>'
+            + '<div class="abs-card-desc">' + absEsc(pdesc) + '</div>'
+            + tagsHtml
+            + '<div class="abs-card-footer">'
+            + '<div class="abs-card-ver">' + verLinks + '</div>'
+            + '<div class="abs-card-actions">' + actionHtml + '</div>'
+            + '</div>';
+        return card;
+    }
+    function addTokenCard(p){
+        if(!p || !p.id) return false;
+        if(document.querySelector('.abs-card[data-id="' + String(p.id).replace(/"/g, '') + '"]')) return false;
+        var grid = document.getElementById('abs-grid');
+        var emptyEl = grid.querySelector('.abs-empty');
+        if(emptyEl && emptyEl.parentNode) emptyEl.parentNode.removeChild(emptyEl);
+        grid.appendChild(buildTokenCard(p));
+        return true;
+    }
+    function ensureTokenTab(){
+        var tabs = document.getElementById('abs-tabs');
+        var count = document.querySelectorAll('.abs-card[data-source="token"]').length;
+        var tab = tabs.querySelector('.abs-tab[data-filter="token"]');
+        if(count > 0 && !tab){
+            tab = document.createElement('button');
+            tab.className = 'abs-tab';
+            tab.dataset.filter = 'token';
+            tabs.appendChild(tab);
+        }
+        if(tab){
+            tab.innerHTML = '口令分享 <span class="abs-tab-count">' + count + '</span>';
+        }
+    }
+    // 恢复 sessionStorage 中的口令插件（刷新页面后仍保留在「口令分享」分类）
+    loadTokenPlugins().forEach(function(p){ addTokenCard(p); });
+    ensureTokenTab();
+    sortCards(sortSel.value);
+
+    function openTokenDialog(){
+        tokenError.style.display = 'none';
+        tokenDlg.style.display = 'flex';
+        requestAnimationFrame(function(){ tokenDlg.classList.add('abs-dialog-open'); });
+        setTimeout(function(){ tokenInput.focus(); }, 120);
+    }
+    function closeTokenDialog(){
+        tokenDlg.classList.remove('abs-dialog-open');
+        setTimeout(function(){ tokenDlg.style.display = 'none'; }, 250);
+    }
+    function showTokenError(msg){
+        tokenError.textContent = msg;
+        tokenError.style.display = '';
+    }
+    document.getElementById('abs-token-btn').addEventListener('click', openTokenDialog);
+    document.getElementById('abs-token-cancel').addEventListener('click', closeTokenDialog);
+    tokenDlg.addEventListener('click', function(e){
+        if(e.target === this) closeTokenDialog();
+    });
+    function submitToken(){
+        var parsed = parseTokenInput(tokenInput.value);
+        if(!parsed){ showTokenError('无法解析，请输入插件口令（ID）或完整分享链接'); return; }
+        // 公开插件已在主列表 → 直接定位滚动
+        var existing = document.querySelector('.abs-card[data-id="' + String(parsed.id).replace(/"/g, '') + '"]');
+        if(existing && existing.dataset.source !== 'token'){
+            closeTokenDialog();
+            existing.scrollIntoView({behavior:'smooth', block:'center'});
+            existing.style.outline = '2px solid var(--md-primary,#4682b4)';
+            existing.style.borderRadius = '16px';
+            setTimeout(function(){ existing.style.outline = ''; }, 2000);
+            absToast('已定位插件：' + (existing.querySelector('.abs-card-name') || {}).textContent || parsed.id, 'success');
+            tokenInput.value = '';
+            return;
+        }
+        tokenSubmit.disabled = true;
+        tokenSubmit.textContent = '查询中…';
+        var qurl = downloadApiBase + '/api/plugin/' + encodeURIComponent(parsed.id) +
+            (parsed.token ? '?token=' + encodeURIComponent(parsed.token) : '');
+        fetch(qurl)
+            .then(function(r){ return r.json(); })
+            .then(function(res){
+                tokenSubmit.disabled = false;
+                tokenSubmit.textContent = '查询并添加';
+                if(res && res.ok && res.plugin){
+                    var p = res.plugin;
+                    p.token = parsed.token;
+                    var list = loadTokenPlugins().filter(function(x){ return x && x.id !== p.id; });
+                    list.push(p);
+                    saveTokenPlugins(list);
+                    var added = addTokenCard(p);
+                    ensureTokenTab();
+                    sortCards(sortSel.value);
+                    closeTokenDialog();
+                    tokenInput.value = '';
+                    absToast(added ? ('已添加插件：' + (p.name || p.id)) : '该插件已在列表中', 'success');
+                } else {
+                    // 公开插件无 token 时若 404，提示需完整链接
+                    var msg = (res && res.message) ? res.message : '插件不存在或口令无效';
+                    if(!parsed.token){
+                        msg = '该插件为待审核 / 私密插件，请粘贴完整分享链接（含 token）';
+                    }
+                    showTokenError(msg);
+                }
+            })
+            .catch(function(){
+                tokenSubmit.disabled = false;
+                tokenSubmit.textContent = '查询并添加';
+                showTokenError('网络错误，无法连接 AB Store');
+            });
+    }
+    tokenSubmit.addEventListener('click', submitToken);
+    tokenInput.addEventListener('keydown', function(e){
+        if(e.key === 'Enter'){ e.preventDefault(); submitToken(); }
+    });
 })();
 </script>
         <?php
@@ -1454,12 +1691,77 @@ JS;
     }
 
     /**
-     * 从远端拉取最新 JSON（统一走 gh1.lhl.one 镜像）
+     * 从 AB Store API 拉取插件列表，并归一化为商店渲染所需的字段结构
+     *
+     * @return array|null ['plugins' => [...], 'updated' => 'Y-m-d H:i:s']；失败返回 null
      */
     public static function fetchRemoteRegistry()
     {
-        $baseUrl = self::REMOTE_JSON_URL;
-        return self::_httpGetJson('https://gh1.lhl.one/' . $baseUrl, 16);
+        $resp = self::_httpGetJson(self::REMOTE_JSON_URL, 16);
+        if (!is_array($resp) || empty($resp['ok']) || !isset($resp['plugins']) || !is_array($resp['plugins'])) {
+            return null;
+        }
+        $plugins = array();
+        foreach ($resp['plugins'] as $p) {
+            if (!is_array($p)) continue;
+            $plugins[] = self::normalizeStorePlugin($p);
+        }
+        return array(
+            'plugins' => $plugins,
+            'updated' => date('Y-m-d H:i:s'),
+        );
+    }
+
+    /**
+     * 将 AB Store API 返回的单个插件字段归一化为 renderStorePage 期望的结构
+     *
+     * 下载统计必须经过 /api/download/<id>，无论是否有 GitHub repo，
+     * 都先由服务端计数再 302 到实际文件地址，避免绕过统计。
+     */
+    private static function normalizeStorePlugin(array $p)
+    {
+        $id     = isset($p['id']) ? trim((string)$p['id']) : '';
+        $github = isset($p['github']) ? trim((string)$p['github']) : '';
+
+        $repo = '';
+        if ($github !== '' && preg_match('#github\.com/([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)#', $github, $m)) {
+            $repo = rtrim($m[1], '/');
+            if (substr($repo, -4) === '.git') $repo = substr($repo, 0, -4);
+        }
+
+        // 无论插件是否有 GitHub repo，下载都统一走 AB Store 下载入口，
+        // 让服务端先 +1 下载计数，然后再跳转到实际下载地址。
+        $downloadUrl = '';
+        if ($id !== '') {
+            $downloadUrl = self::STORE_BASE_URL . '/api/download/' . rawurlencode($id);
+        }
+
+        $tags = array();
+        if (isset($p['tags']) && is_array($p['tags'])) {
+            foreach ($p['tags'] as $t) {
+                $tags[] = (string)$t;
+            }
+        }
+
+        return array(
+            'id'          => $id,
+            'name'        => isset($p['name']) ? (string)$p['name'] : $id,
+            'description' => isset($p['desc']) ? (string)$p['desc'] : '',
+            'author'      => isset($p['author']) ? (string)$p['author'] : '',
+            'authorUrl'   => '',
+            'version'     => isset($p['version']) ? (string)$p['version'] : '',
+            'repo'        => $repo,
+            'directory'   => isset($p['dir']) ? (string)$p['dir'] : '',
+            'homepage'    => isset($p['homepage']) ? (string)$p['homepage'] : '',
+            'tags'        => $tags,
+            'branch'      => 'main',
+            'subDirectory'=> '',
+            'downloadUrl' => $downloadUrl,
+            'downloads'   => isset($p['downloads']) ? intval($p['downloads']) : 0,
+            'minVer'      => isset($p['minVer']) ? (string)$p['minVer'] : '',
+            'maxVer'      => isset($p['maxVer']) ? (string)$p['maxVer'] : '',
+            'updated'     => date('Y-m-d H:i:s'),
+        );
     }
 
     /**
@@ -1708,6 +2010,11 @@ a.abs-btn-text,a.abs-btn-text:hover,a.abs-btn-text:visited{color:var(--md-primar
 .abs-toast-success{background:var(--md-primary-container,#eaddff);color:var(--md-on-primary-container,#21005d);border-left:4px solid var(--md-primary,#6750a4)}
 .abs-toast-error{background:var(--md-error-container,#f9dedc);color:var(--md-on-error-container,#410e0b);border-left:4px solid var(--md-error,#b3261e)}
 .abs-toast-info{background:var(--md-surface-container,#ece6f0);color:var(--md-on-surface,#1c1b1f);border-left:4px solid var(--md-outline-variant,#cac4d0)}
+.abs-badge-pending{background:var(--md-secondary-container,#e8def8);color:var(--md-on-secondary-container,#1d192b);display:inline-flex;align-items:center;gap:3px}
+.abs-badge-archived{background:var(--md-error-container,#f9dedc);color:var(--md-on-error-container,#410e0b);display:inline-flex;align-items:center;gap:3px}
+.abs-card-token{border-style:dashed}
+#abs-root .abs-dialog-input{display:block;width:100%;box-sizing:border-box;padding:10px 14px;border:1px solid var(--md-outline-variant,#cac4d0);border-radius:14px;background:var(--md-surface-container-lowest,#fffbfe);color:var(--md-on-surface,#1c1b1f);font-size:.9rem;font-family:inherit;line-height:1.5;outline:none;transition:border-color .2s,box-shadow .2s}
+#abs-root .abs-dialog-input:focus{border-color:var(--md-primary,#6750a4);box-shadow:0 0 0 2px color-mix(in srgb,var(--md-primary,#6750a4) 20%,transparent)}
 @media(max-width:600px){
 .abs-grid{grid-template-columns:1fr}
 .abs-toolbar{flex-direction:column;align-items:flex-start}

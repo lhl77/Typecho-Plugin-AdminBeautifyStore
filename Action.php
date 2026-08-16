@@ -83,8 +83,12 @@ class AdminBeautifyStore_Action extends Typecho_Widget implements Widget_Interfa
         $downloadUrl = trim($this->request->get('downloadUrl', ''));
         $downloadMode = $this->getDownloadMode();
 
-        if (empty($repo) || empty($dir)) {
-            $this->jsonError('缺少参数 repo / dir', 400);
+        if (empty($dir)) {
+            $this->jsonError('缺少参数 dir', 400);
+        }
+        // 直链模式（downloadUrl）下 repo 可为空；仅 GitHub archive 模式必须提供 repo
+        if (empty($repo) && empty($downloadUrl)) {
+            $this->jsonError('缺少参数 repo / downloadUrl', 400);
         }
 
         $targetDir = $this->pluginsRoot() . $dir;
@@ -179,8 +183,12 @@ class AdminBeautifyStore_Action extends Typecho_Widget implements Widget_Interfa
         $downloadUrl = trim($this->request->get('downloadUrl', ''));
         $downloadMode = $this->getDownloadMode();
 
-        if (empty($repo) || empty($dir)) {
-            $this->jsonError('缺少参数 repo / dir', 400);
+        if (empty($dir)) {
+            $this->jsonError('缺少参数 dir', 400);
+        }
+        // 直链模式（downloadUrl）下 repo 可为空；仅 GitHub archive 模式必须提供 repo
+        if (empty($repo) && empty($downloadUrl)) {
+            $this->jsonError('缺少参数 repo / downloadUrl', 400);
         }
 
         $targetDir = $this->pluginsRoot() . $dir;
@@ -282,7 +290,7 @@ class AdminBeautifyStore_Action extends Typecho_Widget implements Widget_Interfa
             }
             $data = AdminBeautifyStore_Plugin::fetchRemoteRegistry();
             if (!$data) {
-                $this->jsonError('无法获取远程数据，请检查服务器网络或 GitHub 是否可访问', 502);
+                $this->jsonError('无法获取远程数据，请检查服务器网络或 AB Store 是否可访问', 502);
             }
             $data['_cached_at'] = time();
             if (!is_dir($cacheDir)) @mkdir($cacheDir, 0755, true);
@@ -852,6 +860,10 @@ class AdminBeautifyStore_Action extends Typecho_Widget implements Widget_Interfa
     {
         $url = trim((string)$url);
         if ($url === '') return '';
+        // AB Store 直链（/api/download/<id> 302 自动计数）不走 gh1 镜像，避免 404
+        if (strpos($url, 'https://ab-store.lhl.one/') === 0) {
+            return $url;
+        }
         if (strpos($url, 'https://gh1.lhl.one/') === 0) {
             return $url;
         }
