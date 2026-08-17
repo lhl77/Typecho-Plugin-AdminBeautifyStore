@@ -14,39 +14,23 @@
 
 
 <div align="center">
-<h2>投稿</h2>
+<h2>AB Store Web</h2>
+  https://ab-store.lhl.one
+  <br/>
+<h3>这是 AB Store 官方网址，能够浏览插件库，也可分享您的插件。</h3>
 
-直接发issue或提交PR即可，修改`plugins.json`添加你的插件信息。
+<img width="60%" alt="图片" src="https://github.com/user-attachments/assets/b3f80ad1-3e00-4cfe-9305-ccd940d54726" />
 
-|字段|必填|说明|
-|----|----|----|
-|id|	✅	|唯一标识符（建议与 directory 一致）|
-|name|	✅	|显示名称|
-|repo|	✅	|owner/repo，用于构造下载 URL 和 GitHub 链接|
-|directory|	✅	|安装到 plugins/ 下的目录名|
-|version|	✅	|最新版本号（用于更新检测）|
-|branch|	❌	|默认 main，需要时填 master 等|
-|subDirectory|	❌|	downloadUrl解压后`Plugin.php`所在子目录名|
-|downloadUrl|	❌	|有直链时优先用此 URL（monorepo 必填）|
-|author|	❌|	作者名|
-|authorUrl|	❌|	作者主页|
-|description|	❌|	插件描述|
-|homepage|	❌	|插件主页|
-|tags|	❌	|标签数组，用于筛选|
-|changelog|	❌	|更新日志链接（目前仅存储，未使用）|
+<h3>关于投稿</h3>
+投稿需要登录 AB Store Web, 然后在分享界面填入插件信息，您可免费上传不大于10MB的Zip包。[进入AB Store Share 界面](https://ab-store.lhl.one/share)
+<br/>
+
+<h2>AB Store Typecho 插件</h2>
+AB Store 插件下载地址： https://ab-store.lhl.one/plugin/a34adb99
+<h3>插件截图</h3>
+
+<img width="60%"  alt="图片" src="https://github.com/user-attachments/assets/25b85244-d546-4580-82ae-d54cc0a13153" />
+
 
 </div>
 
-### ❗注意事项❗
-1.`downloadUrl`不填默认获取`repo`内`{branch}`分支的内容，不考虑版本号
-
-2.如果按照版本号分发请填写`downloadUrl`,如:`https://github.com/lhl77/Typecho-Plugin-AdminBeautify/archive/refs/tags/v2.1.16.zip`
-
-3.填写`downloadUrl`时,一般需要配置`subDirectory`
-
-4.`subDirectory`仅支持一级目录,不支持添加子目录(不然你下载的`zip`存在冗余信息浪费带宽)
-
-
-|截图|
-|---|
-|![](https://i.see.you/2026/03/13/e0Tx/0e1e75b9b979f3b800dee577a9436ec8.jpg)|
