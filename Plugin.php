@@ -5,7 +5,7 @@
  *
  * @package   AB-Store
  * @author    LHL
- * @version   1.0.23
+ * @version   1.0.24
  * @link      https://github.com/lhl77/Typecho-Plugin-AdminBeautifyStore
  */
 
@@ -271,6 +271,12 @@ JS;
         $registry = self::loadCachedRegistry();
         $plugins  = isset($registry['plugins']) ? $registry['plugins'] : array();
 
+        // 口令分享添加的插件：与主注册表合并，复用同一套本地状态判断与卡片渲染
+        $tokenPlugins = self::loadTokenPlugins();
+        if (!empty($tokenPlugins)) {
+            $plugins = array_merge($plugins, $tokenPlugins);
+        }
+
         // 已安装插件目录列表
         $installedDirs = self::getInstalledPluginDirs();
         $installedMap  = self::buildInstalledVersionMap();
@@ -415,7 +421,22 @@ JS;
             $pdir     = isset($p['directory'])    ? $p['directory']   : '';
             $psubDir      = isset($p['subDirectory']) ? $p['subDirectory'] : '';
             $pdownloadUrl = isset($p['downloadUrl'])  ? $p['downloadUrl']  : '';
+            // 口令分享插件：下载直链附 token；其余插件保持不变
+            if (!empty($p['token']) && $pdownloadUrl !== '') {
+                $pdownloadUrl .= '?token=' . rawurlencode((string)$p['token']);
+            }
+            $pstatus  = isset($p['status'])       ? (string)$p['status'] : 'approved';
+            $psource  = isset($p['source'])       ? (string)$p['source'] : '';
             $phome    = isset($p['homepage'])     ? $p['homepage']    : '';
+            // 插件详情页完整链接：优先使用 AB Store 的完整链接（带分享口令），内置 AB Editor 回退到原主页
+            $pdetail  = '';
+            if ($pid !== '' && $pid !== 'ABEditor') {
+                $pdetail = self::STORE_BASE_URL . '/plugin/' . rawurlencode($pid);
+                $pshare  = isset($p['token']) ? trim((string)$p['token']) : (isset($p['shareToken']) ? trim((string)$p['shareToken']) : '');
+                if ($pshare !== '') {
+                    $pdetail .= '?token=' . rawurlencode($pshare);
+                }
+            }
             $ptags    = isset($p['tags'])         ? (array)$p['tags'] : array();
             $pbranch  = isset($p['branch'])       ? $p['branch']      : 'main';
             $downloadKey = $pid ? $pid : $pdir;
@@ -511,7 +532,8 @@ JS;
              data-editor-tag="<?php echo $hasEditorTag ? '1' : '0'; ?>"
              data-paid-upgrade="<?php echo $isPaidUpgrade ? '1' : '0'; ?>"
              data-blocked-all="<?php echo $blockedAll ? '1' : '0'; ?>"
-             data-blocked-version="<?php echo $blockedVer ? '1' : '0'; ?>">
+             data-blocked-version="<?php echo $blockedVer ? '1' : '0'; ?>"
+             data-source="<?php echo htmlspecialchars($psource); ?>">
 
             <div class="abs-card-header">
                 <div class="abs-card-avatar<?php echo $isInstalled && !$isActivated ? ' abs-avatar-disabled' : ''; ?>">
@@ -537,9 +559,14 @@ JS;
                     </div>
                 </div>
                 <div class="abs-card-badge-wrap">
-                    <?php if ($isFeatured): ?>
+                    <?php if ($pstatus === 'pending'): ?>
+                    <span class="abs-badge abs-badge-pending" title="该插件正在审核中">审核中</span>
+                    <?php elseif ($pstatus === 'archived' || $pstatus === 'rejected'): ?>
+                    <span class="abs-badge abs-badge-archived" title="该插件已下架">已下架</span>
+                    <?php elseif ($isFeatured): ?>
                     <span class="abs-badge abs-badge-featured"><span class="abs-icon" style="font-size:.75rem">auto_awesome</span>推荐</span>
                     <?php endif; ?>
+                    <?php if ($pstatus !== 'archived' && $pstatus !== 'rejected'): ?>
                     <?php if ($isBlocked): ?>
                     <span class="abs-badge abs-badge-blocked">已屏蔽更新</span>
                     <?php elseif ($effectiveUpdate): ?>
@@ -548,6 +575,7 @@ JS;
                     <span class="abs-badge abs-badge-active"><span class="abs-icon" style="font-size:.75rem">check_circle</span>启用中</span>
                     <?php elseif ($isInstalled): ?>
                     <span class="abs-badge abs-badge-disabled">已禁用</span>
+                    <?php endif; ?>
                     <?php endif; ?>
                 </div>
             </div>
@@ -582,10 +610,15 @@ JS;
                         <span class="abs-icon abs-icon-sm">code</span>
                     </a>
                     <?php endif; ?>
-                    <?php if ($phome): ?>
-                    <a href="<?php echo htmlspecialchars($phome); ?>" target="_blank" rel="noopener" class="abs-card-repo" title="插件主页">
+                    <?php if ($pdetail || $phome): ?>
+                    <a href="<?php echo htmlspecialchars($pdetail !== '' ? $pdetail : $phome); ?>" target="_blank" rel="noopener" class="abs-card-repo" title="插件详情页">
                         <span class="abs-icon abs-icon-sm">open_in_new</span>
                     </a>
+                    <?php endif; ?>
+                    <?php if ($psource === 'token'): ?>
+                    <button type="button" class="abs-card-repo abs-token-remove" data-id="<?php echo htmlspecialchars($pid); ?>" title="移除口令分享">
+                        <span class="abs-icon abs-icon-sm">link_off</span>
+                    </button>
                     <?php endif; ?>
                 </div>
                 <div class="abs-card-actions">
@@ -680,13 +713,22 @@ JS;
                     </button>
                     <?php endif; ?>
                     <?php else: ?>
-                    <?php if (!$isSelf && !$isBuiltin): ?>
+                    <?php if (!$isSelf): ?>
+                    <?php if ($isBuiltin): ?>
+                    <button class="abs-btn abs-btn-filled abs-action-btn"
+                            data-action="enable-admin"
+                            data-id="<?php echo htmlspecialchars($pid); ?>"
+                            data-name="<?php echo htmlspecialchars($pname); ?>">
+                        <span class="abs-icon">play_circle_outline</span>启用
+                    </button>
+                    <?php else: ?>
                     <button class="abs-btn abs-btn-filled abs-action-btn"
                             data-action="enable"
                             data-id="<?php echo htmlspecialchars($pid); ?>"
                             data-dir="<?php echo htmlspecialchars($pdir); ?>">
                         <span class="abs-icon">play_circle_outline</span>启用
                     </button>
+                    <?php endif; ?>
                     <?php endif; ?>
                     <?php if (!$isSelf && !$isBuiltin): ?>
                     <button class="abs-btn abs-btn-text abs-action-btn abs-btn-danger-text"
@@ -705,6 +747,8 @@ JS;
                             data-name="<?php echo htmlspecialchars($pname); ?>">
                         <span class="abs-icon">download</span>安装
                     </button>
+                    <?php elseif ($pstatus === 'archived' || $pstatus === 'rejected'): ?>
+                    <button class="abs-btn abs-btn-filled" disabled title="该插件已下架"><span class="abs-icon">block</span>已下架</button>
                     <?php else: ?>
                     <button class="abs-btn abs-btn-filled abs-action-btn"
                             data-action="install"
@@ -770,8 +814,8 @@ JS;
     <!-- 安装 AB Editor 前需先安装 AB Admin 对话框 -->
     <div id="abs-install-admin-dialog" class="abs-dialog-overlay" style="display:none" role="dialog" aria-modal="true">
         <div class="abs-dialog">
-            <h3 class="abs-dialog-title"><span class="abs-icon">download</span>需要先安装 AB Admin</h3>
-            <p class="abs-dialog-body"><strong>AB Editor</strong> 是 <strong>AB Admin</strong>（AdminBeautify）内置的编辑器。请先安装并启用 AB Admin 后，即可在后台使用 AB Editor。</p>
+            <h3 class="abs-dialog-title"><span class="abs-icon">download</span>需要先启用 AB Admin</h3>
+            <p class="abs-dialog-body"><strong>AB Editor</strong> 是 <strong>AB Admin</strong>（AdminBeautify）内置的编辑器，请先安装并启用 AB Admin 后，即可在后台使用 AB Editor。</p>
             <div class="abs-dialog-footer">
                 <button class="abs-btn abs-btn-text" id="abs-install-admin-cancel">取消</button>
                 <button class="abs-btn abs-btn-filled" id="abs-install-admin-goto">前往 AB Admin</button>
@@ -1217,8 +1261,8 @@ JS;
                       ? cardEl.querySelector('.abs-card-name').textContent
                       : (dir || id || ''));
 
-        if(action === 'install-admin'){
-            // AB Editor：不执行安装，弹窗提示先安装 AB Admin
+        if(action === 'install-admin' || action === 'enable-admin'){
+            // AB Editor：不执行安装/启用，弹窗提示先启用 AB Admin
             var aDlg = document.getElementById('abs-install-admin-dialog');
             if(aDlg){ aDlg.style.display = 'flex'; requestAnimationFrame(function(){ aDlg.classList.add('abs-dialog-open'); }); }
             return;
@@ -1527,34 +1571,11 @@ JS;
     });
 
     // ===== 口令安装对话框 =====
-    var TOKEN_STORE_KEY = 'abs-token-plugins';
     var tokenDlg    = document.getElementById('abs-token-dialog');
     var tokenInput  = document.getElementById('abs-token-input');
     var tokenError  = document.getElementById('abs-token-error');
     var tokenSubmit = document.getElementById('abs-token-submit');
 
-    function absEsc(s){
-        return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){
-            return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
-        });
-    }
-    function loadTokenPlugins(){
-        try {
-            var raw = sessionStorage.getItem(TOKEN_STORE_KEY);
-            var arr = raw ? JSON.parse(raw) : [];
-            return (arr && arr.constructor === Array) ? arr : [];
-        } catch(e){ return []; }
-    }
-    function saveTokenPlugins(list){
-        try { sessionStorage.setItem(TOKEN_STORE_KEY, JSON.stringify(list)); } catch(e){}
-    }
-    function extractRepoFromGithub(url){
-        var m = String(url || '').match(/github\.com\/([A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+)/);
-        if(!m) return '';
-        var repo = m[1].replace(/\/+$/, '');
-        if(repo.slice(-4) === '.git') repo = repo.slice(0, -4);
-        return repo;
-    }
     function parseTokenInput(raw){
         var s = String(raw || '').trim();
         if(!s) return null;
@@ -1574,116 +1595,6 @@ JS;
         if(/^[A-Za-z0-9_-]+$/.test(s)) return {id: s, token: ''};
         return null;
     }
-    function buildTokenCard(p){
-        var pid     = String(p.id || '');
-        var pname   = String(p.name || pid);
-        var pdir    = String(p.dir || '');
-        var pdesc   = String(p.desc || '');
-        var pauthor = String(p.author || '');
-        var pver    = String(p.version || '');
-        var phome   = String(p.homepage || '');
-        var ptags   = (p.tags && p.tags.constructor === Array) ? p.tags : [];
-        var downloads = isFinite(Number(p.downloads)) ? Number(p.downloads) : 0;
-        var status  = String(p.status || 'approved');
-        var repo    = extractRepoFromGithub(p.github || '');
-        // 口令插件统一走 /api/download/<id>?token=…（302 直链自动计数，兼容私密/审核中）
-        var downloadUrl = downloadApiBase + '/api/download/' + encodeURIComponent(pid) +
-            (p.token ? '?token=' + encodeURIComponent(p.token) : '');
-        var isDown  = (status === 'archived' || status === 'rejected');
-
-        var displayTags = [];
-        var hasEditorTag = false;
-        ptags.forEach(function(t){
-            t = String(t).trim();
-            if(!t) return;
-            if(t.indexOf('编辑器') !== -1) hasEditorTag = true;
-            if(t === '强调' || t.indexOf('推荐') !== -1) return;
-            displayTags.push(t);
-        });
-
-        var badge = '';
-        if(status === 'pending'){
-            badge = '<span class="abs-badge abs-badge-pending" title="该插件正在审核中">审核中</span>';
-        } else if(isDown){
-            badge = '<span class="abs-badge abs-badge-archived" title="该插件已下架">已下架</span>';
-        }
-
-        var tagsHtml = '';
-        if(displayTags.length){
-            tagsHtml = '<div class="abs-card-tags">' + displayTags.map(function(t){
-                return '<span class="abs-tag">' + absEsc(t) + '</span>';
-            }).join('') + '</div>';
-        }
-
-        var verLinks = '';
-        if(pver) verLinks += '<span>' + absEsc(pver) + '</span>';
-        if(repo) verLinks += '<a href="https://github.com/' + absEsc(repo) + '" target="_blank" rel="noopener" class="abs-card-repo" title="GitHub 仓库"><span class="abs-icon abs-icon-sm">code</span></a>';
-        if(phome) verLinks += '<a href="' + absEsc(phome) + '" target="_blank" rel="noopener" class="abs-card-repo" title="插件主页"><span class="abs-icon abs-icon-sm">open_in_new</span></a>';
-
-        var actionHtml;
-        if(isDown){
-            actionHtml = '<button class="abs-btn abs-btn-filled" disabled title="该插件已下架"><span class="abs-icon">block</span>已下架</button>';
-        } else {
-            actionHtml = '<button class="abs-btn abs-btn-filled abs-action-btn"'
-                + ' data-action="install"'
-                + ' data-id="' + absEsc(pid) + '"'
-                + ' data-dir="' + absEsc(pdir) + '"'
-                + ' data-dlkey="' + absEsc(pid) + '"'
-                + ' data-repo="' + absEsc(repo) + '"'
-                + ' data-branch="main"'
-                + ' data-subdir=""'
-                + ' data-downloadurl="' + absEsc(downloadUrl) + '">'
-                + '<span class="abs-icon">download</span>安装</button>';
-        }
-
-        var card = document.createElement('div');
-        card.className = 'abs-card abs-card-token';
-        card.dataset.index = '9999';
-        card.dataset.id = pid;
-        card.dataset.dir = pdir;
-        card.dataset.downloadKey = pid;
-        card.dataset.installed = '0';
-        card.dataset.activated = '0';
-        card.dataset.hasUpdate = '0';
-        card.dataset.filterTags = displayTags.join(' ');
-        card.dataset.editorTag = hasEditorTag ? '1' : '0';
-        card.dataset.paidUpgrade = '0';
-        card.dataset.blockedAll = '0';
-        card.dataset.blockedVersion = '0';
-        card.dataset.source = 'token';
-        card.innerHTML =
-            '<div class="abs-card-header">'
-            + '<div class="abs-card-avatar">' + absEsc(pname.slice(0, 1) || '?') + '</div>'
-            + '<div class="abs-card-meta">'
-            + '<div class="abs-card-name">' + absEsc(pname) + '</div>'
-            + '<div class="abs-card-author"><div style="display:flex;align-items:center;gap:6px;width:100%">'
-            + '<span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:70%">' + absEsc(pauthor || '匿名') + '</span>'
-            + '<span style="opacity:0.4;font-size:0.75rem;flex-shrink:0">•</span>'
-            + '<span class="abs-download" data-download-key="' + absEsc(pid) + '" data-count="' + downloads + '" title="安装次数" style="flex-shrink:0">'
-            + '<span class="abs-icon" style="font-size:0.95rem">download</span>'
-            + '<span class="abs-download-text">' + downloads + '</span>'
-            + '</span>'
-            + '</div></div>'
-            + '</div>'
-            + '<div class="abs-card-badge-wrap">' + badge + '</div>'
-            + '</div>'
-            + '<div class="abs-card-desc">' + absEsc(pdesc) + '</div>'
-            + tagsHtml
-            + '<div class="abs-card-footer">'
-            + '<div class="abs-card-ver">' + verLinks + '</div>'
-            + '<div class="abs-card-actions">' + actionHtml + '</div>'
-            + '</div>';
-        return card;
-    }
-    function addTokenCard(p){
-        if(!p || !p.id) return false;
-        if(document.querySelector('.abs-card[data-id="' + String(p.id).replace(/"/g, '') + '"]')) return false;
-        var grid = document.getElementById('abs-grid');
-        var emptyEl = grid.querySelector('.abs-empty');
-        if(emptyEl && emptyEl.parentNode) emptyEl.parentNode.removeChild(emptyEl);
-        grid.appendChild(buildTokenCard(p));
-        return true;
-    }
     function ensureTokenTab(){
         var tabs = document.getElementById('abs-tabs');
         var count = document.querySelectorAll('.abs-card[data-source="token"]').length;
@@ -1698,8 +1609,6 @@ JS;
             tab.innerHTML = '口令分享 <span class="abs-tab-count">' + count + '</span>';
         }
     }
-    // 恢复 sessionStorage 中的口令插件（刷新页面后仍保留在「口令分享」分类）
-    loadTokenPlugins().forEach(function(p){ addTokenCard(p); });
     ensureTokenTab();
     sortCards(sortSel.value);
 
@@ -1739,41 +1648,36 @@ JS;
         }
         tokenSubmit.disabled = true;
         tokenSubmit.textContent = '查询中…';
-        var qurl = downloadApiBase + '/api/plugin/' + encodeURIComponent(parsed.id) +
-            (parsed.token ? '?token=' + encodeURIComponent(parsed.token) : '');
-        fetch(qurl)
-            .then(function(r){ return r.json(); })
-            .then(function(res){
-                tokenSubmit.disabled = false;
-                tokenSubmit.textContent = '查询并添加';
-                if(res && res.ok && res.plugin){
-                    var p = res.plugin;
-                    p.token = parsed.token;
-                    var list = loadTokenPlugins().filter(function(x){ return x && x.id !== p.id; });
-                    list.push(p);
-                    saveTokenPlugins(list);
-                    var added = addTokenCard(p);
-                    ensureTokenTab();
-                    sortCards(sortSel.value);
-                    closeTokenDialog();
-                    tokenInput.value = '';
-                    absToast(added ? ('已添加插件：' + (p.name || p.id)) : '该插件已在列表中', 'success');
-                } else {
-                    // 公开插件无 token 时若 404，提示需完整链接
-                    var msg = (res && res.message) ? res.message : '插件不存在或口令无效';
-                    if(!parsed.token){
-                        msg = '该插件为待审核 / 私密插件，请粘贴完整分享链接（含 token）';
-                    }
-                    showTokenError(msg);
-                }
-            })
-            .catch(function(){
-                tokenSubmit.disabled = false;
-                tokenSubmit.textContent = '查询并添加';
-                showTokenError('网络错误，无法连接 AB Store');
-            });
+        // 交由服务端查询并持久化：复用 PHP 的 normalizeStorePlugin 归一化与主列表本地状态判断
+        absPost('tokenAdd', {id: parsed.id, token: parsed.token || ''}, function(res){
+            tokenSubmit.disabled = false;
+            tokenSubmit.textContent = '查询并添加';
+            if(res && res.code === 0){
+                closeTokenDialog();
+                tokenInput.value = '';
+                absToast(res.message || '已添加插件', 'success');
+                setTimeout(function(){ absNavigate(location.href); }, 350);
+            } else {
+                showTokenError((res && res.message) ? res.message : '插件不存在或口令无效');
+            }
+        });
     }
     tokenSubmit.addEventListener('click', submitToken);
+    // 移除口令分享（卡片上的 link_off 图标）
+    document.addEventListener('click', function(e){
+        var rm = e.target.closest ? e.target.closest('.abs-token-remove') : null;
+        if(!rm) return;
+        var rid = rm.dataset.id || '';
+        if(!rid) return;
+        absPost('tokenRemove', {id: rid}, function(res){
+            if(res && res.code === 0){
+                absToast(res.message || '已移除口令分享', 'success');
+                setTimeout(function(){ absNavigate(location.href); }, 350);
+            } else {
+                absToast((res && res.message) ? res.message : '移除失败', 'error');
+            }
+        });
+    });
     tokenInput.addEventListener('keydown', function(e){
         if(e.key === 'Enter'){ e.preventDefault(); submitToken(); }
     });
@@ -1798,6 +1702,82 @@ JS;
         }
         $data = @json_decode(file_get_contents($file), true);
         return is_array($data) ? $data : array('plugins' => array());
+    }
+
+    /** 口令分享插件的本地存储文件 */
+    public static function tokenStoreFile()
+    {
+        return self::pluginDir() . 'token-plugins.json';
+    }
+
+    /** 读取口令分享插件列表（与主注册表相同的归一化结构，额外含 token / source 字段） */
+    public static function loadTokenPlugins()
+    {
+        $file = self::tokenStoreFile();
+        if (!file_exists($file)) return array();
+        $data = @json_decode(file_get_contents($file), true);
+        return is_array($data) ? $data : array();
+    }
+
+    /** 写入口令分享插件列表 */
+    public static function saveTokenPlugins(array $list)
+    {
+        @file_put_contents(self::tokenStoreFile(), json_encode($list, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+    }
+
+    /**
+     * 通过口令查询并添加插件：复用 fetchRemoteRegistry 的归一化逻辑（normalizeStorePlugin），
+     * 与主列表使用完全相同的字段结构，便于后续复用同一套本地状态判断与卡片渲染。
+     */
+    public static function addTokenPlugin($id, $token)
+    {
+        $id    = trim((string)$id);
+        $token = trim((string)$token);
+        if ($id === '') {
+            return array('code' => 1, 'message' => '缺少插件 ID');
+        }
+        $url = self::STORE_BASE_URL . '/api/plugin/' . rawurlencode($id)
+            . ($token !== '' ? '?token=' . rawurlencode($token) : '');
+        $resp = self::_httpGetJson($url, 12);
+        if (!is_array($resp) || empty($resp['ok']) || !isset($resp['plugin']) || !is_array($resp['plugin'])) {
+            return array('code' => 1, 'message' => isset($resp['message']) ? (string)$resp['message'] : '插件不存在或口令无效');
+        }
+        $p = self::normalizeStorePlugin($resp['plugin']);
+        $p['token']  = $token;
+        $p['source'] = 'token';
+        $p['status'] = isset($resp['plugin']['status']) ? (string)$resp['plugin']['status'] : 'approved';
+        $list = self::loadTokenPlugins();
+        $out  = array();
+        $found = false;
+        foreach ($list as $item) {
+            if (isset($item['id']) && $item['id'] === $p['id']) {
+                $out[] = $p;
+                $found = true;
+            } else {
+                $out[] = $item;
+            }
+        }
+        if (!$found) $out[] = $p;
+        self::saveTokenPlugins($out);
+        return array('code' => 0, 'message' => '已添加插件：' . $p['name'], 'plugin' => $p);
+    }
+
+    /** 移除口令分享插件 */
+    public static function removeTokenPlugin($id)
+    {
+        $id = trim((string)$id);
+        $list = self::loadTokenPlugins();
+        $out = array();
+        $removed = false;
+        foreach ($list as $item) {
+            if (isset($item['id']) && $item['id'] === $id) {
+                $removed = true;
+                continue;
+            }
+            $out[] = $item;
+        }
+        if ($removed) self::saveTokenPlugins($out);
+        return $removed;
     }
 
     /**
@@ -1828,7 +1808,7 @@ JS;
      * 下载统计必须经过 /api/download/<id>，无论是否有 GitHub repo，
      * 都先由服务端计数再 302 到实际文件地址，避免绕过统计。
      */
-    private static function normalizeStorePlugin(array $p)
+    public static function normalizeStorePlugin(array $p)
     {
         $id     = isset($p['id']) ? trim((string)$p['id']) : '';
         $github = isset($p['github']) ? trim((string)$p['github']) : '';
@@ -1868,6 +1848,7 @@ JS;
             'subDirectory'=> '',
             'downloadUrl' => $downloadUrl,
             'downloads'   => isset($p['downloads']) ? intval($p['downloads']) : 0,
+            'shareToken'  => isset($p['shareToken']) ? (string)$p['shareToken'] : '',
             'minVer'      => isset($p['minVer']) ? (string)$p['minVer'] : '',
             'maxVer'      => isset($p['maxVer']) ? (string)$p['maxVer'] : '',
             'updated'     => date('Y-m-d H:i:s'),
@@ -1877,7 +1858,7 @@ JS;
     /**
      * 内部工具：HTTP GET 拉取 JSON，失败返回 null
      */
-    private static function _httpGetJson($url, $timeout = 8)
+    public static function _httpGetJson($url, $timeout = 8)
     {
         $ctx = stream_context_create(array(
             'http' => array(

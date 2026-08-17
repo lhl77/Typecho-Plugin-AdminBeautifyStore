@@ -60,6 +60,12 @@ class AdminBeautifyStore_Action extends Typecho_Widget implements Widget_Interfa
             case 'blockUpdate':
                 $this->handleBlockUpdate();
                 break;
+            case 'tokenAdd':
+                $this->handleTokenAdd();
+                break;
+            case 'tokenRemove':
+                $this->handleTokenRemove();
+                break;
             default:
                 $this->jsonError('未知操作', 400);
         }
@@ -274,10 +280,40 @@ class AdminBeautifyStore_Action extends Typecho_Widget implements Widget_Interfa
      * force=1（手动"刷新列表"按钮）：释放 Session → 同步请求 GitHub（含镜像兜底）→ 返回结果
      * 无 force（自动后台刷新）     ：立即返回当前缓存条数，后台异步拉取（stale-while-revalidate）
      */
+    /**
+     * 通过口令添加插件：服务端查询 API 并归一化（复用主注册表逻辑），保存到本地文件，
+     * 刷新页面后由 renderStorePage 与主列表合并渲染，共享本地安装/启用状态判断。
+     */
+    private function handleTokenAdd()
+    {
+        $this->checkAdmin();
+        $id    = trim($this->request->get('id', ''));
+        $token = trim($this->request->get('token', ''));
+        if (!class_exists('AdminBeautifyStore_Plugin')) {
+            require_once dirname(__FILE__) . '/Plugin.php';
+        }
+        $result = AdminBeautifyStore_Plugin::addTokenPlugin($id, $token);
+        if (!isset($result['code']) || $result['code'] !== 0) {
+            $this->jsonError(isset($result['message']) ? $result['message'] : '插件不存在或口令无效', 400);
+        }
+        $this->jsonSuccess(array('id' => isset($result['plugin']['id']) ? $result['plugin']['id'] : $id), $result['message']);
+    }
+
+    /** 移除口令分享插件 */
+    private function handleTokenRemove()
+    {
+        $this->checkAdmin();
+        $id = trim($this->request->get('id', ''));
+        if (!class_exists('AdminBeautifyStore_Plugin')) {
+            require_once dirname(__FILE__) . '/Plugin.php';
+        }
+        $removed = AdminBeautifyStore_Plugin::removeTokenPlugin($id);
+        $this->jsonSuccess(array('removed' => $removed), $removed ? '已移除口令分享' : '未找到该插件');
+    }
+
     private function handleRefresh()
     {
         $this->checkAdmin();
-
         $force     = ($this->request->get('force', '0') === '1');
         $cacheFile = AdminBeautifyStore_Plugin::cacheFile();
         $lockFile  = dirname($cacheFile) . DIRECTORY_SEPARATOR . '.refresh_lock';
