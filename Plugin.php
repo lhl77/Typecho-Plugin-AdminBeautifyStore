@@ -5,7 +5,7 @@
  *
  * @package   AB-Store
  * @author    LHL
- * @version   1.0.22
+ * @version   1.0.23
  * @link      https://github.com/lhl77/Typecho-Plugin-AdminBeautifyStore
  */
 
@@ -144,6 +144,9 @@ class AdminBeautifyStore_Plugin implements Typecho_Plugin_Interface
             return;
         }
 
+        self::maybeInjectLightVars();
+        self::maybeInjectIconFont();
+
         $options  = Typecho_Widget::widget('Widget_Options');
         $security = Typecho_Widget::widget('Widget_Security');
         $ajaxUrl  = Typecho_Common::url('/action/abs', $options->index);
@@ -201,10 +204,57 @@ JS;
     // ================================================================
 
     /**
+     * 检测 AB Admin（AdminBeautify）是否已启用。
+     * 启用时其负责提供 --md-* 主题变量与暗色模式；未启用时本插件自带亮色变量。
+     */
+    public static function isAbAdminActive()
+    {
+        try {
+            $plugins = Typecho_Plugin::export();
+            return !empty($plugins['activated']) && isset($plugins['activated']['AdminBeautify']);
+        } catch (Exception $e) {
+            return false;
+        }
+    }
+
+    /**
+     * AB Admin（AdminBeautify）未启用时，通过 loli.net 镜像加载 Material Icons Round，
+     * 保证商店页与更新横幅中的图标正常显示。
+     */
+    private static function maybeInjectIconFont()
+    {
+        if (self::isAbAdminActive()) {
+            return; // AB Admin 已启用，图标字体由其提供
+        }
+        echo '<link rel="stylesheet" href="https://fonts.loli.net/icon?family=Material+Icons+Round">' . "\n";
+    }
+
+    /**
+     * AB Admin 未启用时注入亮色主题变量，保证商店页在任意系统主题下均为亮色。
+     */
+    private static function maybeInjectLightVars()
+    {
+        if (self::isAbAdminActive()) {
+            return; // 变量由 AB Admin 提供（含暗色模式），不做覆盖
+        }
+        echo '<style id="abs-light-vars">:root{'
+            . '--md-primary:#4682B4;--md-on-primary:#FFFFFF;--md-primary-container:#D1E4F6;--md-on-primary-container:#001D36;'
+            . '--md-secondary:#567392;--md-secondary-container:#DCE7F4;--md-on-secondary-container:#0A2437;'
+            . '--md-tertiary:#3E6B5F;--md-tertiary-container:#DFF0EC;--md-on-tertiary-container:#00201B;'
+            . '--md-surface:#F8FAFE;--md-surface-container-lowest:#FFFFFF;--md-surface-container-low:#F3F6FA;--md-surface-container:#EDF1F7;--md-surface-container-high:#E7EBF2;--md-surface-container-highest:#E1E5EC;'
+            . '--md-on-surface:#191C1F;--md-on-surface-variant:#42474E;--md-outline:#72787F;--md-outline-variant:#C2C7CF;'
+            . '--md-error:#B3261E;--md-on-error:#FFFFFF;--md-error-container:#F9DEDC;--md-on-error-container:#410E0B;'
+            . '}</style>' . "\n";
+    }
+
+    /**
      * 渲染商店主界面
      */
     public static function renderStorePage()
     {
+        self::maybeInjectLightVars();
+        self::maybeInjectIconFont();
+
         // ── 内联样式（MD3 风格，全部使用 var(--md-*) 变量）──
         echo '<style id="abs-inline-style">';
         self::outputCSS();
@@ -403,9 +453,10 @@ JS;
             $isSelf       = ($pdir === 'AdminBeautifyStore');
             // 是否为内置插件（AB Editor：不显示禁用按钮，设置链接到 AdminBeautify 的编辑器定位）
             $isBuiltin    = ($pid === 'ABEditor');
-            // 是否带"编辑器"标签（安装前提醒用户可用 AB Editor 内置编辑器）
+            // 是否带"编辑器"标签（安装前提醒用户可用 AB Editor 内置编辑器）；
+            // AB Admin 自身不提示（它本来就内置 AB Editor），避免安装 AB Admin 时弹此提醒
             $hasEditorTag = false;
-            if (!$isBuiltin) {
+            if (!$isBuiltin && $pdir !== 'AdminBeautify') {
                 foreach ($ptags as $tag) {
                     if (mb_strpos((string)$tag, '编辑器', 0, 'UTF-8') !== false) {
                         $hasEditorTag = true;
@@ -436,6 +487,11 @@ JS;
             // 内置 AB Editor 的设置按钮：直达 AdminBeautify 设置页并定位到编辑器项
             if ($isBuiltin) {
                 $settingsUrl = $options->adminUrl . 'options-plugin.php?config=AdminBeautify&to=editor_vditor';
+            }
+            // 内置 AB Editor：不提供升级/更新徽章，避免显示任何插件操作按钮
+            if ($isBuiltin) {
+                $hasUpdate = false;
+                $effectiveUpdate = false;
             }
             $cardClass = 'abs-card';
             if ($isInstalled && $isActivated) $cardClass .= ' abs-card-active';
@@ -624,13 +680,15 @@ JS;
                     </button>
                     <?php endif; ?>
                     <?php else: ?>
+                    <?php if (!$isSelf && !$isBuiltin): ?>
                     <button class="abs-btn abs-btn-filled abs-action-btn"
                             data-action="enable"
                             data-id="<?php echo htmlspecialchars($pid); ?>"
                             data-dir="<?php echo htmlspecialchars($pdir); ?>">
                         <span class="abs-icon">play_circle_outline</span>启用
                     </button>
-                    <?php if (!$isSelf): ?>
+                    <?php endif; ?>
+                    <?php if (!$isSelf && !$isBuiltin): ?>
                     <button class="abs-btn abs-btn-text abs-action-btn abs-btn-danger-text"
                             data-action="uninstall"
                             data-id="<?php echo htmlspecialchars($pid); ?>"
@@ -639,6 +697,14 @@ JS;
                     </button>
                     <?php endif; ?>
                     <?php endif; ?>
+                    <?php else: ?>
+                    <?php if ($isBuiltin): ?>
+                    <button class="abs-btn abs-btn-filled abs-action-btn"
+                            data-action="install-admin"
+                            data-id="<?php echo htmlspecialchars($pid); ?>"
+                            data-name="<?php echo htmlspecialchars($pname); ?>">
+                        <span class="abs-icon">download</span>安装
+                    </button>
                     <?php else: ?>
                     <button class="abs-btn abs-btn-filled abs-action-btn"
                             data-action="install"
@@ -651,6 +717,7 @@ JS;
                             data-downloadurl="<?php echo htmlspecialchars($pdownloadUrl); ?>">
                         <span class="abs-icon">download</span>安装
                     </button>
+                    <?php endif; ?>
                     <?php endif; ?>
                 </div>
             </div>
@@ -696,6 +763,18 @@ JS;
                 <button class="abs-btn abs-btn-text" id="abs-editor-cancel">取消</button>
                 <button class="abs-btn abs-btn-tonal" id="abs-editor-goto">前往 AB Editor</button>
                 <button class="abs-btn abs-btn-filled" id="abs-editor-continue">仍要安装</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 安装 AB Editor 前需先安装 AB Admin 对话框 -->
+    <div id="abs-install-admin-dialog" class="abs-dialog-overlay" style="display:none" role="dialog" aria-modal="true">
+        <div class="abs-dialog">
+            <h3 class="abs-dialog-title"><span class="abs-icon">download</span>需要先安装 AB Admin</h3>
+            <p class="abs-dialog-body"><strong>AB Editor</strong> 是 <strong>AB Admin</strong>（AdminBeautify）内置的编辑器。请先安装并启用 AB Admin 后，即可在后台使用 AB Editor。</p>
+            <div class="abs-dialog-footer">
+                <button class="abs-btn abs-btn-text" id="abs-install-admin-cancel">取消</button>
+                <button class="abs-btn abs-btn-filled" id="abs-install-admin-goto">前往 AB Admin</button>
             </div>
         </div>
     </div>
@@ -763,7 +842,7 @@ JS;
     var progressTimer = null;
 
     // ── 将 overlay 移到 body，避免祖先 transform 破坏 position:fixed 定位 ──
-    ['abs-progress', 'abs-uninstall-dialog', 'abs-editor-dialog', 'abs-paid-dialog', 'abs-block-dialog', 'abs-token-dialog'].forEach(function(id){
+    ['abs-progress', 'abs-uninstall-dialog', 'abs-editor-dialog', 'abs-install-admin-dialog', 'abs-paid-dialog', 'abs-block-dialog', 'abs-token-dialog'].forEach(function(id){
         var el = document.getElementById(id);
         if (el && el.parentNode !== document.body) document.body.appendChild(el);
     });
@@ -1138,6 +1217,12 @@ JS;
                       ? cardEl.querySelector('.abs-card-name').textContent
                       : (dir || id || ''));
 
+        if(action === 'install-admin'){
+            // AB Editor：不执行安装，弹窗提示先安装 AB Admin
+            var aDlg = document.getElementById('abs-install-admin-dialog');
+            if(aDlg){ aDlg.style.display = 'flex'; requestAnimationFrame(function(){ aDlg.classList.add('abs-dialog-open'); }); }
+            return;
+        }
         if(action === 'install'){
             var editorTag = cardEl && cardEl.dataset.editorTag === '1';
             if(editorTag){
@@ -1356,6 +1441,31 @@ JS;
     // 点击遮罩关闭对话框
     document.getElementById('abs-editor-dialog').addEventListener('click', function(e){
         if(e.target === this) closeEditorDialog();
+    });
+
+    // ===== 安装 AB Admin 对话框 =====
+    function closeInstallAdminDialog(){
+        var dlg = document.getElementById('abs-install-admin-dialog');
+        if(!dlg) return;
+        dlg.classList.remove('abs-dialog-open');
+        setTimeout(function(){ dlg.style.display = 'none'; }, 250);
+    }
+    var iac = document.getElementById('abs-install-admin-cancel');
+    if(iac) iac.addEventListener('click', closeInstallAdminDialog);
+    var iad = document.getElementById('abs-install-admin-dialog');
+    if(iad) iad.addEventListener('click', function(e){ if(e.target === this) closeInstallAdminDialog(); });
+
+    // 前往 AB Admin：在面板内定位到其卡片（ID c3238849）并高亮，便于直接安装
+    var iag = document.getElementById('abs-install-admin-goto');
+    if(iag) iag.addEventListener('click', function(){
+        closeInstallAdminDialog();
+        var abAdminCard = document.querySelector('.abs-card[data-id="c3238849"]');
+        if(abAdminCard){
+            abAdminCard.style.display = '';
+            abAdminCard.scrollIntoView({behavior:'smooth', block:'center'});
+            abAdminCard.classList.add('abs-card-flash');
+            setTimeout(function(){ abAdminCard.classList.remove('abs-card-flash'); }, 1800);
+        }
     });
 
     // ===== Links+ 付费升级提醒对话框 =====
@@ -2028,10 +2138,16 @@ a.abs-btn-text,a.abs-btn-text:hover,a.abs-btn-text:visited{color:var(--md-primar
 .abs-progress-card{padding:22px 16px 16px;border-radius:24px;min-width:0;width:100%}
 .abs-toast{bottom:16px;padding:10px 18px;font-size:.85rem}
 }
+<?php
+        // 深色适配仅在 AB Admin 启用时输出：其提供暗色变量，此时可微调推荐卡片；
+        // AB Admin 未启用时始终保持亮色模式（修复推荐卡片/tag 背景变黑的问题）。
+        if (self::isAbAdminActive()) {
+        ?>
 @media (prefers-color-scheme: dark){
 .abs-card-featured{border-color:color-mix(in srgb,#FFB300 35%,var(--md-outline-variant,#49454f));background:linear-gradient(135deg,color-mix(in srgb,#FFB300 8%,var(--md-surface-container-low,#1f1b24)) 0%,var(--md-surface-container-low,#1f1b24) 100%);box-shadow:0 6px 20px color-mix(in srgb,#FFB300 12%,transparent)}
 .abs-card-featured::before{background:linear-gradient(90deg,#FFD54F,#FBC02D);opacity:1}
 }
-        <?php
+<?php
+        }
     }
 }
