@@ -1,0 +1,32 @@
+name = "ab-store"
+main = "src/index.js"
+compatibility_date = "2025-01-01"
+
+[[kv_namespaces]]
+binding = "KV"
+id = "1ead87b6d04b4a20a1e047eee2f2c29b"
+
+# ===== 非敏感 vars（可入库） =====
+[vars]
+TURNSTILE_SITEKEY = "0x4AAAAAAERqKKOLi6_ppvGa"
+TURNSTILE_HOSTNAMES = "ab-store.lhl.one"
+GH1_BASE = "https://gh1.lhl.one"
+GITHUB_REPO = "lhl77/Typecho-Plugin-AdminBeautifyStore"
+GITHUB_BRANCH = "share"
+ADMIN_USERS = "lhl"
+ADMIN_EMAILS = "admin@lhl.one"
+MAIL_FROM = "AB Store 插件仓库 <noreply@lhl.one>"
+SMTP_HOST = "smtp.resend.com"
+SMTP_PORT = "465"
+SMTP_USER = "resend"
+WEBDAV_BASE = "https://alist-fr.lhl.one/dav/ab-store-share"
+WEBDAV_USER = "admin"
+GITHUB_CLIENT_ID = "Ov23lioVS6LHUl2FmkxN"
+
+# ===== 敏感 secrets（wrangler secret put / .dev.vars，不入库） =====
+# TURNSTILE_SECRET
+# WEBDAV_PASS
+# SMTP_PASS
+# GITHUB_CLIENT_SECRET
+
+# 路由：ab-store.lhl.one/*（自定义域，Cloudflare Dashboard 绑定）

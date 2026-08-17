@@ -1,0 +1,14 @@
+{
+  "name": "ab-store",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "AB Store - Typecho 插件分享仓库（Cloudflare Worker）",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy"
+  },
+  "devDependencies": {
+    "wrangler": "^4.0.0"
+  }
+}

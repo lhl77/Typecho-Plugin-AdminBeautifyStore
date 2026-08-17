@@ -1,36 +1,44 @@
-<h1 align="center">AB 插件仓库</h1>
-<p align="center">
-  <img src="https://img.shields.io/badge/Typecho->=1.3.0-orange?style=flat-square" alt="Typecho 1.3.0">
-  <img src="https://img.shields.io/badge/PHP-%3E%3D7.2-777BB4?style=flat-square&logo=php&logoColor=white" alt="PHP >= 7.2">
-  <img src="https://img.shields.io/badge/design-Material%20Design%203-6750A4?style=flat-square&logo=materialdesign&logoColor=white" alt="Material Design 3">
-  <a href="https://github.com/lhl77/Typecho-Plugin-AdminBeautifyStore/stargazers"><img src="https://img.shields.io/github/stars/lhl77/Typecho-Plugin-AdminBeautifyStore?style=flat-square&logo=github" alt="GitHub Stars"></a>
-  <a href="https://github.com/lhl77/Typecho-Plugin-AdminBeautifyStore/network/members"><img src="https://img.shields.io/github/forks/lhl77/Typecho-Plugin-AdminBeautifyStore?style=flat-square&logo=github" alt="GitHub Forks"></a>
-</p>
+# AB Store 服务端（Cloudflare Worker）
 
-<p align="center">
-  <strong>Admin Beautify 主题美化插件 - 专用插件库</strong><br/>
-  Admin Beautify： <a href="https://github.com/lhl77/Typecho-Plugin-AdminBeautify" target="_blank">lhl77/Typecho-Plugin-AdminBeautify</a>
-</p>
+Typecho 插件分享仓库「AB Store」的服务端，部署于 Cloudflare Workers，域名 `ab-store.lhl.one`。
+方案细节见 [PLAN.md](./PLAN.md)，配置项逐项说明见 [CONFIG.md](./CONFIG.md)。
 
+## 功能
 
-<div align="center">
-<h2>AB Store Web</h2>
-  https://ab-store.lhl.one
-  <br/>
-<h3>这是 AB Store 官方网址，能够浏览插件库，也可分享您的插件。</h3>
+- 首页（MD3 响应式）：介绍 + 已上架插件列表
+- 账号：邮箱 + 密码注册（强制邮箱验证码）、忘记密码、GitHub 绑定与快捷登录（GitHub 不能直接注册）
+- 分享：外链 URL 或上传 ZIP（≤2MB，WebDAV → OpenList → GitHub share 分支），自动分配 6 位分享口令
+- 审核：管理员（`ADMIN_USERS`）登录后可见「审核」入口，通过 / 拒绝 / 编辑 / 下架，全程 SMTP 邮件通知
+- 下载：`/api/download/<id>` 计数后 302 到 gh1.lhl.one 镜像直链
 
-<img width="60%" alt="图片" src="https://github.com/user-attachments/assets/b3f80ad1-3e00-4cfe-9305-ccd940d54726" />
+## 部署
 
-<h3>关于投稿</h3>
-投稿需要登录 AB Store Web, 然后在分享界面填入插件信息，您可免费上传不大于10MB的Zip包。[进入AB Store Share 界面](https://ab-store.lhl.one/share)
-<br/>
+```bash
+# 1. 安装依赖（仅需 wrangler）
+npm i -g wrangler
 
-<h2>AB Store Typecho 插件</h2>
-AB Store 插件下载地址： https://ab-store.lhl.one/plugin/a34adb99
-<h3>插件截图</h3>
+# 2. 创建 KV 命名空间，把返回的 id 填入 wrangler.toml
+wrangler kv namespace create KV
 
-<img width="60%"  alt="图片" src="https://github.com/user-attachments/assets/25b85244-d546-4580-82ae-d54cc0a13153" />
+# 3. 填写 wrangler.toml 的 [vars]（见 CONFIG.md）
 
+# 4. 设置密钥
+wrangler secret put TURNSTILE_SECRET
+wrangler secret put WEBDAV_PASS
+wrangler secret put SMTP_PASS
+wrangler secret put GITHUB_CLIENT_SECRET
 
-</div>
+# 5. 本地开发
+cp .dev.vars.example .dev.vars   # 填入真实密钥
+wrangler dev
 
+# 6. 部署
+wrangler deploy
+# 然后在 Cloudflare Dashboard 为该 Worker 绑定自定义域 ab-store.lhl.one
+```
+
+## 前置条件
+
+- OpenList 已挂载 GitHub 仓库 `lhl77/Typecho-Plugin-AdminBeautifyStore` 的 `share` 分支，且 WebDAV 入口（`WEBDAV_BASE`）指向该挂载目录。
+- gh1.lhl.one 白名单中包含 `lhl77/Typecho-Plugin-AdminBeautifyStore`（或使用其 `/d/` 免白名单路径，届时调整 `src/lib/webdav.js` 的 `buildDownloadUrl`）。
+- GitHub OAuth App 的回调地址配置为 `https://ab-store.lhl.one/auth/github/callback`。
