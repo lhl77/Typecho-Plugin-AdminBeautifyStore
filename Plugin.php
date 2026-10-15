@@ -5,7 +5,7 @@
  *
  * @package   AB-Store
  * @author    LHL
- * @version   1.0.24
+ * @version   1.0.25
  * @link      https://github.com/lhl77/Typecho-Plugin-AdminBeautifyStore
  */
 
@@ -196,7 +196,7 @@ JS;
         echo '</script>';
 
         $assetBase = Typecho_Common::url('AdminBeautifyStore/assets/', $options->pluginUrl);
-        echo '<script src="' . $assetBase . 'update-check.v1.0.18.js"></script>' . "\n";
+        echo '<script src="' . $assetBase . 'update-check.v1.0.25.js"></script>' . "\n";
     }
 
     // ================================================================
